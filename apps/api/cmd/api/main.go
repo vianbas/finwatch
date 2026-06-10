@@ -20,12 +20,17 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/vianbas/finwatch/apps/api/internal/alerts"
+	alerthttp "github.com/vianbas/finwatch/apps/api/internal/alerts/httpapi"
+	alertstore "github.com/vianbas/finwatch/apps/api/internal/alerts/store"
 	"github.com/vianbas/finwatch/apps/api/internal/config"
 	"github.com/vianbas/finwatch/apps/api/internal/platform/httpserver"
 	"github.com/vianbas/finwatch/apps/api/internal/platform/postgres"
+	"github.com/vianbas/finwatch/apps/api/internal/rules"
+	rulestore "github.com/vianbas/finwatch/apps/api/internal/rules/store"
 	"github.com/vianbas/finwatch/apps/api/internal/transactions"
-	"github.com/vianbas/finwatch/apps/api/internal/transactions/httpapi"
-	"github.com/vianbas/finwatch/apps/api/internal/transactions/store"
+	txhttp "github.com/vianbas/finwatch/apps/api/internal/transactions/httpapi"
+	txstore "github.com/vianbas/finwatch/apps/api/internal/transactions/store"
 )
 
 func main() {
@@ -53,11 +58,28 @@ func main() {
 	}
 }
 
-// newTransactionsService wires the transactions module over a connection pool.
-func newTransactionsService(pool *pgxpool.Pool, logger *slog.Logger) *transactions.Service {
-	repo := store.New(pool)
-	gen := transactions.NewGenerator(time.Now().UnixNano())
-	return transactions.NewService(repo, gen, logger)
+// appServices holds the wired feature services.
+type appServices struct {
+	transactions *transactions.Service
+	alerts       *alerts.Service
+	rules        rules.Repository
+}
+
+// buildServices wires the feature modules over a connection pool, registering
+// the alerts service as the transactions observer so that ingesting a
+// transaction triggers rule evaluation and alert raising.
+func buildServices(pool *pgxpool.Pool, logger *slog.Logger) appServices {
+	rulesRepo := rulestore.New(pool)
+	alertSvc := alerts.NewService(alertstore.New(pool), rulesRepo, logger)
+
+	txSvc := transactions.NewService(
+		txstore.New(pool),
+		transactions.NewGenerator(time.Now().UnixNano()),
+		logger,
+	)
+	txSvc.SetObserver(alertSvc)
+
+	return appServices{transactions: txSvc, alerts: alertSvc, rules: rulesRepo}
 }
 
 // runSeed ingests synthetic transactions for local development and testing.
@@ -83,8 +105,15 @@ func runSeed(args []string) error {
 	}
 	defer pool.Close()
 
-	svc := newTransactionsService(pool, logger)
-	persisted, err := svc.Ingest(ctx, *count)
+	svcs := buildServices(pool, logger)
+
+	// Ensure the generic default rules exist so ingestion can raise alerts.
+	if err := svcs.rules.EnsureDefaults(ctx); err != nil {
+		logger.Error("failed to ensure default rules", slog.String("error", err.Error()))
+		return err
+	}
+
+	persisted, err := svcs.transactions.Ingest(ctx, *count)
 	if err != nil {
 		logger.Error("seed failed", slog.Int("persisted", persisted), slog.String("error", err.Error()))
 		return err
@@ -137,12 +166,15 @@ func run() error {
 	}
 	defer pool.Close()
 
-	txHandler := httpapi.NewHandler(newTransactionsService(pool, logger), logger)
+	svcs := buildServices(pool, logger)
 
 	router := httpserver.NewRouter(httpserver.RouterDeps{
-		Logger:  logger,
-		Health:  httpserver.NewHealthHandler(pool),
-		Modules: []httpserver.RouteRegistrar{txHandler},
+		Logger: logger,
+		Health: httpserver.NewHealthHandler(pool),
+		Modules: []httpserver.RouteRegistrar{
+			txhttp.NewHandler(svcs.transactions, logger),
+			alerthttp.NewHandler(svcs.alerts, logger),
+		},
 	})
 
 	srv := httpserver.New(httpserver.Options{
