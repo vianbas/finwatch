@@ -54,10 +54,10 @@ components:
         $ref: "#/components/schemas/TransactionObservedEnvelope"
     AlertRaised:
       name: alert.raised
-      title: Alert raised (placeholder)
-      summary: Emitted when an operational alert is raised. Payload is a placeholder.
+      title: Alert raised
+      summary: Emitted when an operational alert is raised from a rule match.
       payload:
-        $ref: "#/components/schemas/Envelope"
+        $ref: "#/components/schemas/AlertRaisedEnvelope"
   schemas:
     Envelope:
       type: object
@@ -82,6 +82,40 @@ components:
           type: object
           description: Event-type-specific payload. Defined per event in later issues.
           additionalProperties: true
+    AlertRaisedEnvelope:
+      description: |
+        The alert.raised event. The `data` object is exactly what is stored in
+        the transactional outbox row's payload.
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            type:
+              const: alert.raised
+            data:
+              $ref: "#/components/schemas/AlertRaisedData"
+    AlertRaisedData:
+      type: object
+      required: [alertId, ruleId, transactionId, severity, status, raisedAt]
+      properties:
+        alertId:
+          type: string
+          format: uuid
+        ruleId:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+          format: uuid
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        status:
+          type: string
+          enum: [open, acknowledged, resolved]
+        raisedAt:
+          type: string
+          format: date-time
     TransactionObservedEnvelope:
       description: |
         The transaction.observed event. The `data` object is exactly what is
