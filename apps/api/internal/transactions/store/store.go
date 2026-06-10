@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/vianbas/finwatch/apps/api/internal/platform/postgres/db"
+	"github.com/vianbas/finwatch/apps/api/internal/platform/postgres/pgconv"
 	"github.com/vianbas/finwatch/apps/api/internal/transactions"
 )
 
@@ -62,7 +62,7 @@ func (s *Store) Save(ctx context.Context, t transactions.Transaction) (transacti
 		Currency:    t.Currency,
 		Direction:   string(t.Direction),
 		Status:      string(t.Status),
-		OccurredAt:  timestamptz(t.OccurredAt),
+		OccurredAt:  pgconv.Timestamptz(t.OccurredAt),
 	})
 	if err != nil {
 		return transactions.Transaction{}, fmt.Errorf("store: insert transaction: %w", err)
@@ -114,12 +114,12 @@ func (s *Store) List(ctx context.Context, q transactions.PageQuery) (transaction
 	if q.After == nil {
 		rows, err = queries.ListTransactionsFirstPage(ctx, fetch)
 	} else {
-		var cursorID pgtype.UUID
-		if scanErr := cursorID.Scan(q.After.ID); scanErr != nil {
+		cursorID, scanErr := pgconv.ParseUUID(q.After.ID)
+		if scanErr != nil {
 			return transactions.Page{}, fmt.Errorf("store: invalid cursor id: %w", scanErr)
 		}
 		rows, err = queries.ListTransactionsAfterCursor(ctx, db.ListTransactionsAfterCursorParams{
-			CursorOccurredAt: timestamptz(q.After.OccurredAt),
+			CursorOccurredAt: pgconv.Timestamptz(q.After.OccurredAt),
 			CursorID:         cursorID,
 			PageLimit:        fetch,
 		})
@@ -146,7 +146,7 @@ func (s *Store) List(ctx context.Context, q transactions.PageQuery) (transaction
 
 func toDomain(r db.Transaction) transactions.Transaction {
 	return transactions.Transaction{
-		ID:          uuidString(r.ID),
+		ID:          pgconv.UUIDString(r.ID),
 		AccountID:   r.AccountID,
 		AmountMinor: r.AmountMinor,
 		Currency:    r.Currency,
@@ -155,17 +155,4 @@ func toDomain(r db.Transaction) transactions.Transaction {
 		OccurredAt:  r.OccurredAt.Time.UTC(),
 		CreatedAt:   r.CreatedAt.Time.UTC(),
 	}
-}
-
-func timestamptz(t time.Time) pgtype.Timestamptz {
-	return pgtype.Timestamptz{Time: t.UTC(), Valid: true}
-}
-
-// uuidString renders a pgtype.UUID as its canonical textual form.
-func uuidString(u pgtype.UUID) string {
-	if !u.Valid {
-		return ""
-	}
-	b := u.Bytes
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }

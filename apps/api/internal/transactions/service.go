@@ -41,16 +41,30 @@ type Repository interface {
 	List(ctx context.Context, q PageQuery) (Page, error)
 }
 
+// Observer is notified after each transaction is persisted. Downstream modules
+// (e.g. alerts) implement it to react to ingestion, so the transactions module
+// never imports them. It is best-effort: an observer error does not roll back
+// the already-committed transaction.
+type Observer interface {
+	TransactionIngested(ctx context.Context, t Transaction) error
+}
+
 // Service orchestrates transaction ingestion and listing.
 type Service struct {
-	repo Repository
-	gen  *Generator
-	log  *slog.Logger
+	repo     Repository
+	gen      *Generator
+	log      *slog.Logger
+	observer Observer
 }
 
 // NewService constructs a Service.
 func NewService(repo Repository, gen *Generator, log *slog.Logger) *Service {
 	return &Service{repo: repo, gen: gen, log: log}
+}
+
+// SetObserver registers an observer notified after each successful save.
+func (s *Service) SetObserver(o Observer) {
+	s.observer = o
 }
 
 // Ingest generates and persists n synthetic transactions. Each transaction and
@@ -60,12 +74,22 @@ func NewService(repo Repository, gen *Generator, log *slog.Logger) *Service {
 func (s *Service) Ingest(ctx context.Context, n int) (int, error) {
 	created := 0
 	for i := 0; i < n; i++ {
-		if _, err := s.repo.Save(ctx, s.gen.Next()); err != nil {
+		saved, err := s.repo.Save(ctx, s.gen.Next())
+		if err != nil {
 			s.log.ErrorContext(ctx, "ingest failed",
 				slog.Int("persisted", created), slog.String("error", err.Error()))
 			return created, err
 		}
 		created++
+
+		// Notify observers (e.g. rule evaluation). Best-effort: the transaction
+		// is already committed, so an observer failure is logged, not fatal.
+		if s.observer != nil {
+			if err := s.observer.TransactionIngested(ctx, saved); err != nil {
+				s.log.ErrorContext(ctx, "transaction observer failed",
+					slog.String("transaction_id", saved.ID), slog.String("error", err.Error()))
+			}
+		}
 	}
 	s.log.InfoContext(ctx, "ingested synthetic transactions", slog.Int("count", created))
 	return created, nil

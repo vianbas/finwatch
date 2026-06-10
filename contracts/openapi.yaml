@@ -26,6 +26,8 @@ tags:
     description: Operational liveness and readiness probes.
   - name: transactions
     description: Synthetic transaction records.
+  - name: alerts
+    description: Operational alerts and their lifecycle.
 
 paths:
   /health/live:
@@ -109,6 +111,127 @@ paths:
                 error:
                   code: INVALID_QUERY
                   message: limit must be between 1 and 200
+  /alerts:
+    get:
+      tags: [alerts]
+      operationId: listAlerts
+      summary: List alerts
+      description: |
+        Returns a page of alerts, most-recent first, with an optional status
+        filter and opaque keyset (cursor) pagination.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by lifecycle status.
+          schema:
+            type: string
+            enum: [open, acknowledged, resolved]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor from a previous response's nextCursor.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A page of alerts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertPage"
+        "400":
+          description: Invalid query parameters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /alerts/{id}:
+    get:
+      tags: [alerts]
+      operationId: getAlert
+      summary: Get an alert by id
+      parameters:
+        - $ref: "#/components/parameters/AlertId"
+      responses:
+        "200":
+          description: The alert.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+        "404":
+          description: Alert not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /alerts/{id}/acknowledge:
+    post:
+      tags: [alerts]
+      operationId: acknowledgeAlert
+      summary: Acknowledge an alert (open → acknowledged)
+      description: Idempotent — returns the alert unchanged if already acknowledged.
+      parameters:
+        - $ref: "#/components/parameters/AlertId"
+      responses:
+        "200":
+          description: The updated alert.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+        "404":
+          description: Alert not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The alert is not in a state that allows acknowledgement.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: INVALID_TRANSITION
+                  message: alert is not in a state that allows this transition
+  /alerts/{id}/resolve:
+    post:
+      tags: [alerts]
+      operationId: resolveAlert
+      summary: Resolve an alert (acknowledged → resolved)
+      description: Idempotent — returns the alert unchanged if already resolved.
+      parameters:
+        - $ref: "#/components/parameters/AlertId"
+      responses:
+        "200":
+          description: The updated alert.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+        "404":
+          description: Alert not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The alert is not in a state that allows resolution.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
 components:
   schemas:
@@ -166,6 +289,42 @@ components:
         nextCursor:
           type: [string, "null"]
           description: Opaque cursor for the next page, or null when there are no more.
+    Alert:
+      type: object
+      required: [id, ruleId, transactionId, status, severity, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ruleId:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [open, acknowledged, resolved]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AlertPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Alert"
+        nextCursor:
+          type: [string, "null"]
+          description: Opaque cursor for the next page, or null when there are no more.
     Error:
       type: object
       description: Canonical error envelope returned by all error responses.
@@ -181,6 +340,15 @@ components:
             message:
               type: string
               description: Human-readable description; safe to display.
+  parameters:
+    AlertId:
+      name: id
+      in: path
+      required: true
+      description: Alert identifier.
+      schema:
+        type: string
+        format: uuid
   responses:
     NotFound:
       description: Resource not found.

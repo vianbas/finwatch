@@ -38,12 +38,14 @@ func newTestPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-// resetSchema drops the feature tables and re-applies all up migrations.
+// resetSchema wipes the public schema and re-applies all up migrations. A full
+// schema reset (rather than dropping named tables) keeps this robust as later
+// migrations add tables and foreign keys.
 func resetSchema(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	ctx := context.Background()
-	if _, err := pool.Exec(ctx, `DROP TABLE IF EXISTS transactions, outbox_events CASCADE`); err != nil {
-		t.Fatalf("drop tables: %v", err)
+	if _, err := pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public`); err != nil {
+		t.Fatalf("reset schema: %v", err)
 	}
 	dir := filepath.Join("..", "..", "..", "migrations")
 	entries, err := os.ReadDir(dir)

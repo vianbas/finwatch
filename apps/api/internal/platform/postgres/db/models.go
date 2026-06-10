@@ -8,6 +8,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Alert struct {
+	ID            pgtype.UUID        `json:"id"`
+	RuleID        pgtype.UUID        `json:"rule_id"`
+	TransactionID pgtype.UUID        `json:"transaction_id"`
+	Status        string             `json:"status"`
+	Severity      string             `json:"severity"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
 type OutboxEvent struct {
 	ID          int64              `json:"id"`
 	Aggregate   string             `json:"aggregate"`
@@ -15,6 +25,17 @@ type OutboxEvent struct {
 	Payload     []byte             `json:"payload"`
 	OccurredAt  pgtype.Timestamptz `json:"occurred_at"`
 	PublishedAt pgtype.Timestamptz `json:"published_at"`
+}
+
+type Rule struct {
+	ID        pgtype.UUID        `json:"id"`
+	Name      string             `json:"name"`
+	Field     string             `json:"field"`
+	Operator  string             `json:"operator"`
+	Value     string             `json:"value"`
+	Severity  string             `json:"severity"`
+	Enabled   bool               `json:"enabled"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Transaction struct {
