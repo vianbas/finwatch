@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/vianbas/finwatch/apps/api/internal/platform/web"
 )
 
 // contextKey is an unexported type to avoid collisions in request context.
@@ -64,7 +66,7 @@ func Recoverer(logger *slog.Logger) func(http.Handler) http.Handler {
 						slog.String("path", r.URL.Path),
 						slog.String("request_id", RequestIDFromContext(r.Context())),
 					)
-					writeError(w, http.StatusInternalServerError, "INTERNAL", "internal server error")
+					web.WriteError(w, http.StatusInternalServerError, "INTERNAL", "internal server error")
 				}
 			}()
 			next.ServeHTTP(w, r)

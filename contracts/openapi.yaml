@@ -24,6 +24,8 @@ servers:
 tags:
   - name: health
     description: Operational liveness and readiness probes.
+  - name: transactions
+    description: Synthetic transaction records.
 
 paths:
   /health/live:
@@ -66,6 +68,47 @@ paths:
                 error:
                   code: NOT_READY
                   message: database unreachable
+  /transactions:
+    get:
+      tags: [transactions]
+      operationId: listTransactions
+      summary: List synthetic transactions
+      description: |
+        Returns a page of synthetic transactions, most-recent first, using
+        opaque keyset (cursor) pagination. All data is synthetic.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum items to return (1-200, default 50).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor from a previous response's nextCursor.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A page of transactions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionPage"
+        "400":
+          description: Invalid query parameters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: INVALID_QUERY
+                  message: limit must be between 1 and 200
 
 components:
   schemas:
@@ -83,6 +126,46 @@ components:
         status:
           type: string
           enum: [ready]
+    Transaction:
+      type: object
+      description: A single synthetic transaction. Amounts are integer minor units.
+      required: [id, accountId, amountMinor, currency, direction, status, occurredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        accountId:
+          type: string
+          description: Synthetic account identifier.
+        amountMinor:
+          type: integer
+          format: int64
+          description: Amount in integer minor units (e.g. cents). Always positive.
+        currency:
+          type: string
+          description: ISO 4217 currency code.
+          pattern: "^[A-Z]{3}$"
+        direction:
+          type: string
+          enum: [debit, credit]
+        status:
+          type: string
+          enum: [posted]
+        occurredAt:
+          type: string
+          format: date-time
+          description: RFC 3339 (UTC) time the transaction occurred.
+    TransactionPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        nextCursor:
+          type: [string, "null"]
+          description: Opaque cursor for the next page, or null when there are no more.
     Error:
       type: object
       description: Canonical error envelope returned by all error responses.

@@ -7,7 +7,9 @@ WEB_DIR := apps/web
 COMPOSE := docker compose
 
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap dev stop lint test build verify \
+N ?= 50
+
+.PHONY: help bootstrap dev stop lint test build verify sqlc seed \
         api-lint api-test api-build web-lint web-typecheck web-test web-build compose-config
 
 help: ## List available targets
@@ -59,3 +61,9 @@ web-build:
 
 compose-config: ## Validate the Docker Compose file
 	$(COMPOSE) config -q && echo "docker-compose.yml is valid"
+
+sqlc: ## Regenerate type-safe DB code from SQL (requires sqlc on PATH)
+	cd $(API_DIR) && sqlc generate
+
+seed: ## Ingest N synthetic transactions (make seed N=100); needs DATABASE_URL
+	cd $(API_DIR) && go run ./cmd/api seed -n $(N)
