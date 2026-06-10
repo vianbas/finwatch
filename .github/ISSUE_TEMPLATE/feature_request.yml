@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose a new capability or improvement for FinWatch.
+title: "feat: <short summary>"
+labels: ["type:feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a feature. FinWatch is a synthetic-data reference
+        implementation — please do not include real or proprietary data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this solve? Who benefits?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the change. Note any contract (OpenAPI/AsyncAPI) impact.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope & acceptance criteria
+      description: A checklist of what "done" means.
+    validations:
+      required: true
+  - type: checkboxes
+    id: guardrails
+    attributes:
+      label: Guardrails
+      options:
+        - label: This involves synthetic data only (no real or proprietary data).
+          required: true
+        - label: No secrets or credentials are included.
+          required: true
