@@ -1,0 +1,111 @@
+openapi: 3.1.0
+info:
+  title: FinWatch API
+  version: 0.1.0
+  description: |
+    REST contract for FinWatch — an open-source reference implementation for
+    near-real-time transaction monitoring and operational alert workflows using
+    synthetic data.
+
+    This is the contract-first source of truth: handlers must conform to it.
+    Only operational endpoints exist in the bootstrap; feature endpoints
+    (transactions, alerts, rules) are added in their own issues.
+
+    Conventions:
+      * Monetary values are integer minor units (never floating point).
+      * Timestamps are RFC 3339 (UTC) at the API boundary.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: health
+    description: Operational liveness and readiness probes.
+
+paths:
+  /health/live:
+    get:
+      tags: [health]
+      operationId: getLiveness
+      summary: Liveness probe
+      description: Returns 200 while the process is running. No dependencies are checked.
+      responses:
+        "200":
+          description: Process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LivenessStatus"
+              example:
+                status: ok
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: getReadiness
+      summary: Readiness probe
+      description: Returns 200 only when all downstream dependencies are reachable.
+      responses:
+        "200":
+          description: Service is ready to accept traffic.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessStatus"
+              example:
+                status: ready
+        "503":
+          description: A dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: NOT_READY
+                  message: database unreachable
+
+components:
+  schemas:
+    LivenessStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    ReadinessStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ready]
+    Error:
+      type: object
+      description: Canonical error envelope returned by all error responses.
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable, machine-readable error code (e.g. NOT_FOUND).
+            message:
+              type: string
+              description: Human-readable description; safe to display.
+  responses:
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: NOT_FOUND
+              message: resource not found

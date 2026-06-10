@@ -1,0 +1,84 @@
+asyncapi: 3.0.0
+info:
+  title: FinWatch Realtime API
+  version: 0.1.0
+  description: |
+    WebSocket/event contract for FinWatch. Real-time delivery uses a PostgreSQL
+    transactional outbox relayed to an in-process WebSocket hub (no external
+    brokers). This bootstrap defines only the common event envelope and
+    placeholder event types; producers and the hub are implemented in later
+    issues.
+
+    Conventions:
+      * Every event uses the common Envelope.
+      * `occurredAt` is RFC 3339 (UTC).
+      * Monetary fields in future payloads are integer minor units.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  local:
+    host: localhost:8080
+    pathname: /ws
+    protocol: ws
+    description: Local development WebSocket endpoint.
+
+channels:
+  events:
+    address: /ws
+    description: Server-to-client stream of operational events.
+    messages:
+      transactionObserved:
+        $ref: "#/components/messages/TransactionObserved"
+      alertRaised:
+        $ref: "#/components/messages/AlertRaised"
+
+operations:
+  receiveEvents:
+    action: receive
+    channel:
+      $ref: "#/channels/events"
+    summary: Client receives operational events from the server.
+    messages:
+      - $ref: "#/channels/events/messages/transactionObserved"
+      - $ref: "#/channels/events/messages/alertRaised"
+
+components:
+  messages:
+    TransactionObserved:
+      name: transaction.observed
+      title: Transaction observed (placeholder)
+      summary: Emitted when a synthetic transaction is ingested. Payload is a placeholder.
+      payload:
+        $ref: "#/components/schemas/Envelope"
+    AlertRaised:
+      name: alert.raised
+      title: Alert raised (placeholder)
+      summary: Emitted when an operational alert is raised. Payload is a placeholder.
+      payload:
+        $ref: "#/components/schemas/Envelope"
+  schemas:
+    Envelope:
+      type: object
+      description: Common event envelope wrapping every realtime message.
+      required: [id, type, version, occurredAt, data]
+      properties:
+        id:
+          type: string
+          description: Unique event identifier.
+        type:
+          type: string
+          description: Event type, e.g. transaction.observed or alert.raised.
+        version:
+          type: integer
+          minimum: 1
+          description: Schema version of the data payload.
+        occurredAt:
+          type: string
+          format: date-time
+          description: RFC 3339 (UTC) timestamp of when the event occurred.
+        data:
+          type: object
+          description: Event-type-specific payload. Defined per event in later issues.
+          additionalProperties: true
