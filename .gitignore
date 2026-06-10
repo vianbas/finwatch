@@ -1,0 +1,28 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Go
+/apps/api/bin/
+*.test
+*.out
+coverage.*
+
+# Node / frontend
+node_modules/
+/apps/web/dist/
+/apps/web/coverage/
+*.tsbuildinfo
+
+# Tooling / editor
+.DS_Store
+.idea/
+.vscode/
+tmp/
+
+# CodeGraph local index (not part of the source contract)
+.codegraph/
+
+# Local, per-developer Claude Code settings
+.claude/settings.local.json

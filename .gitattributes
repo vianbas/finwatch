@@ -1,0 +1,18 @@
+# Normalise line endings: text is LF in the repo, native on checkout where noted.
+* text=auto eol=lf
+
+*.go    text eol=lf
+*.sql   text eol=lf
+*.sh    text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+
+# Treat lockfiles and generated artefacts as binary-ish to reduce diff noise.
+package-lock.json -diff
+go.sum            -diff
+
+# Exclude non-essential paths from release archives.
+/.github   export-ignore
+/docs      export-ignore

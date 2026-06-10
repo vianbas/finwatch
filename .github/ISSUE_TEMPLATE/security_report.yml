@@ -1,0 +1,31 @@
+name: Security report guidance
+description: How to report a security vulnerability (do not file details here).
+title: "security: <do NOT include vulnerability details here>"
+labels: ["type:security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Do not disclose vulnerabilities in public issues
+
+        Public issues are visible to everyone. **Do not** include exploit
+        details, proof-of-concept, or sensitive specifics here.
+
+        Instead, report privately:
+
+        - Use **private vulnerability reporting**:
+          https://github.com/vianbas/finwatch/security/advisories/new
+        - Or contact the maintainer (`@vianbas`) privately.
+
+        See [SECURITY.md](../../SECURITY.md) for the full policy.
+
+        This template exists only to direct you to the correct, private channel.
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I understand I should report vulnerability details privately, not in this issue.
+          required: true
+        - label: I will not include real personal/financial data, secrets, or proprietary information.
+          required: true
