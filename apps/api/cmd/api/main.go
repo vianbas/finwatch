@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,9 +18,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/vianbas/finwatch/apps/api/internal/config"
 	"github.com/vianbas/finwatch/apps/api/internal/platform/httpserver"
 	"github.com/vianbas/finwatch/apps/api/internal/platform/postgres"
+	"github.com/vianbas/finwatch/apps/api/internal/transactions"
+	"github.com/vianbas/finwatch/apps/api/internal/transactions/httpapi"
+	"github.com/vianbas/finwatch/apps/api/internal/transactions/store"
 )
 
 func main() {
@@ -33,10 +39,58 @@ func main() {
 		return
 	}
 
+	// `api seed -n N` ingests N synthetic transactions and exits.
+	if len(os.Args) > 1 && os.Args[1] == "seed" {
+		if err := runSeed(os.Args[2:]); err != nil {
+			os.Exit(1)
+		}
+		return
+	}
+
 	if err := run(); err != nil {
 		// run already logged the cause; this is the final, fatal exit.
 		os.Exit(1)
 	}
+}
+
+// newTransactionsService wires the transactions module over a connection pool.
+func newTransactionsService(pool *pgxpool.Pool, logger *slog.Logger) *transactions.Service {
+	repo := store.New(pool)
+	gen := transactions.NewGenerator(time.Now().UnixNano())
+	return transactions.NewService(repo, gen, logger)
+}
+
+// runSeed ingests synthetic transactions for local development and testing.
+func runSeed(args []string) error {
+	fs := flag.NewFlagSet("seed", flag.ExitOnError)
+	count := fs.Int("n", 50, "number of synthetic transactions to ingest")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	cfg, err := config.Load(os.Getenv)
+	logger := newLogger(cfg, err)
+	if err != nil {
+		logger.Error("invalid configuration", slog.String("error", err.Error()))
+		return err
+	}
+
+	ctx := context.Background()
+	pool, err := postgres.NewPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("failed to initialise database pool", slog.String("error", err.Error()))
+		return err
+	}
+	defer pool.Close()
+
+	svc := newTransactionsService(pool, logger)
+	persisted, err := svc.Ingest(ctx, *count)
+	if err != nil {
+		logger.Error("seed failed", slog.Int("persisted", persisted), slog.String("error", err.Error()))
+		return err
+	}
+	logger.Info("seed complete", slog.Int("persisted", persisted))
+	return nil
 }
 
 // healthcheck performs a localhost liveness request against the configured port.
@@ -83,9 +137,12 @@ func run() error {
 	}
 	defer pool.Close()
 
+	txHandler := httpapi.NewHandler(newTransactionsService(pool, logger), logger)
+
 	router := httpserver.NewRouter(httpserver.RouterDeps{
-		Logger: logger,
-		Health: httpserver.NewHealthHandler(pool),
+		Logger:  logger,
+		Health:  httpserver.NewHealthHandler(pool),
+		Modules: []httpserver.RouteRegistrar{txHandler},
 	})
 
 	srv := httpserver.New(httpserver.Options{
