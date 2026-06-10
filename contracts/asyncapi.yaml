@@ -48,10 +48,10 @@ components:
   messages:
     TransactionObserved:
       name: transaction.observed
-      title: Transaction observed (placeholder)
-      summary: Emitted when a synthetic transaction is ingested. Payload is a placeholder.
+      title: Transaction observed
+      summary: Emitted when a synthetic transaction is ingested.
       payload:
-        $ref: "#/components/schemas/Envelope"
+        $ref: "#/components/schemas/TransactionObservedEnvelope"
     AlertRaised:
       name: alert.raised
       title: Alert raised (placeholder)
@@ -82,3 +82,41 @@ components:
           type: object
           description: Event-type-specific payload. Defined per event in later issues.
           additionalProperties: true
+    TransactionObservedEnvelope:
+      description: |
+        The transaction.observed event. The `data` object is exactly what is
+        stored in the transactional outbox row's payload; the relay populates
+        the envelope fields (id, type, occurredAt) from the outbox row.
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            type:
+              const: transaction.observed
+            data:
+              $ref: "#/components/schemas/TransactionObservedData"
+    TransactionObservedData:
+      type: object
+      required: [transactionId, accountId, amountMinor, currency, direction, status, occurredAt]
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        accountId:
+          type: string
+        amountMinor:
+          type: integer
+          format: int64
+          description: Integer minor units; always positive.
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+        direction:
+          type: string
+          enum: [debit, credit]
+        status:
+          type: string
+          enum: [posted]
+        occurredAt:
+          type: string
+          format: date-time
