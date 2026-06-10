@@ -47,6 +47,7 @@ Then:
 
 - API liveness — http://localhost:8080/health/live
 - API readiness — http://localhost:8080/health/ready
+- Transactions — http://localhost:8080/transactions (seed first: `make seed N=100`)
 - Web app — http://localhost:8081
 
 Stop the stack with `make stop`.

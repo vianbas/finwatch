@@ -71,6 +71,51 @@ migrate -path apps/api/migrations -database "$DATABASE_URL" up
 
 See [apps/api/migrations/README.md](../../apps/api/migrations/README.md).
 
+## Seeding synthetic transactions
+
+The API does not ingest from any external source; synthetic transactions are
+generated locally. With the database migrated, ingest a batch:
+
+```sh
+make seed N=100          # or: cd apps/api && go run ./cmd/api seed -n 100
+```
+
+Each insert writes a `transaction.observed` row to the outbox in the same
+database transaction. List the results (most-recent first, cursor-paginated):
+
+```sh
+curl 'http://localhost:8080/transactions?limit=20'
+# follow nextCursor for the next page:
+curl 'http://localhost:8080/transactions?limit=20&cursor=<nextCursor>'
+```
+
+## Database integration tests
+
+The store integration tests run only when `FINWATCH_TEST_DATABASE_URL` points at
+a disposable database; otherwise they skip (so `make verify` stays green without
+a DB). Against the local stack:
+
+```sh
+make dev   # Postgres on localhost:5432
+FINWATCH_TEST_DATABASE_URL='postgres://finwatch:finwatch_dev_password@localhost:5432/finwatch?sslmode=disable' \
+  go test ./apps/api/internal/transactions/store/...
+```
+
+These tests reset the feature tables and re-apply the migrations themselves. CI
+runs them automatically against a Postgres service.
+
+## Regenerating database code (sqlc)
+
+Data access is generated from SQL with [sqlc](https://sqlc.dev) (no ORM). After
+changing `apps/api/queries/*.sql` or a migration, regenerate:
+
+```sh
+make sqlc                 # requires `sqlc` on PATH
+```
+
+The generated code under `apps/api/internal/platform/postgres/db` is committed;
+`make verify` does not run sqlc.
+
 ## Quality gate
 
 Before pushing:
