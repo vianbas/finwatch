@@ -1,0 +1,16 @@
+# sqlc generates type-safe Go from SQL. No queries exist yet in this bootstrap,
+# so `sqlc generate` is not part of `make verify`. As feature modules add files
+# under internal/<module>/queries, this configuration generates their data
+# access code. No ORM is used.
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: "migrations"
+    queries: "queries"
+    gen:
+      go:
+        package: "db"
+        out: "internal/platform/postgres/db"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_pointers_for_null_types: true

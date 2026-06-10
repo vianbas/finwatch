@@ -1,0 +1,9 @@
+# Keep the build context minimal and free of local artefacts.
+.git
+.gitignore
+*.md
+Dockerfile
+.dockerignore
+bin/
+tmp/
+**/*_test.go
