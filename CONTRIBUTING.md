@@ -25,6 +25,12 @@ for near-real-time transaction monitoring and operational alert workflows using
    make verify
    git diff --check
    ```
+   If you changed any `apps/api/queries/*.sql` file or added a migration,
+   regenerate the sqlc output and verify it before committing:
+   ```sh
+   make sqlc          # regenerate apps/api/internal/platform/postgres/db/
+   make sqlc-check    # confirm generated code matches sources (runs sqlc diff)
+   ```
 5. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/):
    `type(scope): summary` (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`,
    `ci`, `build`).
