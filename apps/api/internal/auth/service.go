@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -58,6 +59,7 @@ var dummyPasswordHash = sync.OnceValue(func() string {
 // token and the authenticated user. Unknown email and wrong password both
 // return ErrInvalidCredentials so the caller cannot distinguish them.
 func (s *Service) Login(ctx context.Context, email, password string) (string, User, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
 	user, err := s.store.GetUserByEmail(ctx, email)
 	if errors.Is(err, ErrUserNotFound) {
 		// Run a bcrypt comparison against a dummy hash so this path costs

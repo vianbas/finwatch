@@ -19,11 +19,13 @@ func RequireAuth(verifier *Verifier) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token, ok := bearerToken(r.Header.Get("Authorization"))
 			if !ok {
+				w.Header().Set("WWW-Authenticate", "Bearer")
 				web.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing bearer token")
 				return
 			}
 			claims, err := verifier.Verify(token)
 			if err != nil {
+				w.Header().Set("WWW-Authenticate", "Bearer")
 				web.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "invalid or expired token")
 				return
 			}
@@ -54,12 +56,14 @@ func ClaimsFromContext(ctx context.Context) (Claims, bool) {
 	return claims, ok
 }
 
+// bearerToken extracts the token from an Authorization header. The auth
+// scheme ("Bearer") is matched case-insensitively per RFC 7235 section 2.1.
 func bearerToken(header string) (string, bool) {
-	const prefix = "Bearer "
-	if !strings.HasPrefix(header, prefix) {
+	scheme, token, found := strings.Cut(header, " ")
+	if !found || !strings.EqualFold(scheme, "Bearer") {
 		return "", false
 	}
-	token := strings.TrimSpace(strings.TrimPrefix(header, prefix))
+	token = strings.TrimSpace(token)
 	if token == "" {
 		return "", false
 	}

@@ -66,6 +66,22 @@ func TestService_Login_WrongPassword(t *testing.T) {
 	}
 }
 
+func TestService_Login_EmailIsCaseInsensitive(t *testing.T) {
+	user := userWithPassword(t, "operator@example.com", "correct-password", auth.RoleOperator)
+	svc := newTestService(t, user)
+
+	token, got, err := svc.Login(context.Background(), "Operator@Example.com", "correct-password")
+	if err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	if token == "" {
+		t.Errorf("want non-empty token")
+	}
+	if got.Email != user.Email {
+		t.Errorf("got email %q, want %q", got.Email, user.Email)
+	}
+}
+
 func TestService_Login_UnknownEmail(t *testing.T) {
 	svc := newTestService(t)
 

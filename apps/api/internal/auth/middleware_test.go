@@ -73,6 +73,37 @@ func TestRequireAuth_ExpiredToken(t *testing.T) {
 	}
 }
 
+func TestRequireAuth_LowercaseBearerScheme(t *testing.T) {
+	verifier := auth.NewVerifier([]byte(mwTestSecret))
+	handler := auth.RequireAuth(verifier)(okHandler())
+	token := issueToken(t, 15*time.Minute, auth.RoleOperator)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "bearer "+token)
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestRequireAuth_MissingTokenSetsWWWAuthenticate(t *testing.T) {
+	verifier := auth.NewVerifier([]byte(mwTestSecret))
+	handler := auth.RequireAuth(verifier)(okHandler())
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+	if got := rec.Header().Get("WWW-Authenticate"); got != "Bearer" {
+		t.Errorf("WWW-Authenticate = %q, want %q", got, "Bearer")
+	}
+}
+
 func TestRequireAuth_ValidToken(t *testing.T) {
 	verifier := auth.NewVerifier([]byte(mwTestSecret))
 	handler := auth.RequireAuth(verifier)(okHandler())
