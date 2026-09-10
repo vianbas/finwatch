@@ -42,6 +42,36 @@ Stop the stack:
 make stop
 ```
 
+## Authentication (local development)
+
+The API requires `Authorization: Bearer <token>` on every route except
+`/login` and `/health/*`. Create the two demo accounts (idempotent) before
+logging in:
+
+```sh
+cd apps/api && go run ./cmd/api seed-users
+# or, against the compose stack:
+docker compose exec api /app/api seed-users
+```
+
+This creates `operator@example.com` and `admin@example.com`, with passwords
+taken from `DEMO_OPERATOR_PASSWORD` / `DEMO_ADMIN_PASSWORD` (see
+`.env.example` for the example dev values). Then log in:
+
+```sh
+curl -s -X POST http://localhost:8080/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"operator@example.com","password":"operator_dev_password"}'
+```
+
+Access tokens are short-lived (`JWT_ACCESS_TOKEN_TTL`, default 15 minutes) and
+there is no refresh token — once a token expires, sign in again; refresh is
+future work. The web app keeps the token in memory only, never in
+`localStorage`/`sessionStorage`, so reloading the page signs you out.
+
+Rotating `JWT_SIGNING_SECRET` (at least 32 characters) and restarting the API
+invalidates every outstanding token.
+
 ## Running pieces directly
 
 Backend:

@@ -49,5 +49,5 @@ integrations. Everything runs locally via Docker Compose.
 
 ## Out of scope (this bootstrap)
 
-Transaction ingestion, rule evaluation, alerting, authentication/RBAC, and live
-WebSocket streaming. These are tracked as follow-up issues.
+Transaction ingestion, rule evaluation, alerting, RBAC route enforcement, and
+live WebSocket streaming. These are tracked as follow-up issues.
