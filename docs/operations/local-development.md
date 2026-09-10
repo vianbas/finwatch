@@ -45,8 +45,10 @@ make stop
 ## Authentication (local development)
 
 The API requires `Authorization: Bearer <token>` on every route except
-`/login` and `/health/*`. Create the two demo accounts (idempotent) before
-logging in:
+`/login` and `/health/*`. Migrations (including `0004_users`, which creates
+the accounts table) must be applied — see
+[Database migrations](#database-migrations) below — before `seed-users` can
+run. Create the two demo accounts (idempotent) before logging in:
 
 ```sh
 cd apps/api && go run ./cmd/api seed-users
@@ -54,14 +56,19 @@ cd apps/api && go run ./cmd/api seed-users
 docker compose exec api /app/api seed-users
 ```
 
-This creates `operator@example.com` and `admin@example.com`, with passwords
-taken from `DEMO_OPERATOR_PASSWORD` / `DEMO_ADMIN_PASSWORD` (see
-`.env.example` for the example dev values). Then log in:
+This creates `operator@example.com` and `admin@example.com`. Passwords come
+from `DEMO_OPERATOR_PASSWORD` / `DEMO_ADMIN_PASSWORD` (see `.env.example` for
+the example dev values); `docker compose` passes these through from `.env`
+automatically, and outside `development` (`APP_ENV=staging` or `production`)
+both variables are required — `seed-users` exits with an error naming the
+missing variable rather than falling back to a published password. Then log
+in and use the token on every protected request:
 
 ```sh
-curl -s -X POST http://localhost:8080/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"operator@example.com","password":"operator_dev_password"}'
+TOKEN=$(curl -s -X POST http://localhost:8080/login -H 'Content-Type: application/json' \
+  -d '{"email":"operator@example.com","password":"operator_dev_password"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')
+curl -s -H "Authorization: Bearer $TOKEN" 'http://localhost:8080/transactions?limit=5'
 ```
 
 Access tokens are short-lived (`JWT_ACCESS_TOKEN_TTL`, default 15 minutes) and
@@ -111,12 +118,13 @@ make seed N=100          # or: cd apps/api && go run ./cmd/api seed -n 100
 ```
 
 Each insert writes a `transaction.observed` row to the outbox in the same
-database transaction. List the results (most-recent first, cursor-paginated):
+database transaction. List the results (most-recent first, cursor-paginated;
+`$TOKEN` is a bearer token from [Authentication](#authentication-local-development)):
 
 ```sh
-curl 'http://localhost:8080/transactions?limit=20'
+curl -s -H "Authorization: Bearer $TOKEN" 'http://localhost:8080/transactions?limit=20'
 # follow nextCursor for the next page:
-curl 'http://localhost:8080/transactions?limit=20&cursor=<nextCursor>'
+curl -s -H "Authorization: Bearer $TOKEN" 'http://localhost:8080/transactions?limit=20&cursor=<nextCursor>'
 ```
 
 ## Database integration tests

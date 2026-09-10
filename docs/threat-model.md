@@ -27,7 +27,7 @@ and contribute to.
 | **Tampering** | Malformed/oversized requests | Bounded HTTP timeouts; input validated at handlers (per-feature) | Schema validation against OpenAPI |
 | **Repudiation** | No trace of actions | Per-request IDs + structured access logs | Audit logging for state changes |
 | **Information disclosure** | Secrets/PII leakage | No secrets in repo; synthetic data only; logs exclude secrets/PII | Secret scanning, log review |
-| **Denial of service** | Slow-client / resource exhaustion | Read/write/idle timeouts; panic recovery; graceful shutdown | Rate limiting, connection caps |
+| **Denial of service** | Slow-client / resource exhaustion | Read/write/idle timeouts; panic recovery; graceful shutdown | Rate limiting on `POST /login` (bcrypt cost makes it both a brute-force target and a CPU sink), connection caps |
 | **Elevation of privilege** | Acting beyond role | N/A (`RequireRole` exists but is not yet mounted on any route) | RBAC enforced server-side |
 
 ## Supply chain
