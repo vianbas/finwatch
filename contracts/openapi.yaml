@@ -102,6 +102,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: INVALID_BODY
+                  message: email and password are required
         "401":
           description: Email or password is incorrect.
           content:
