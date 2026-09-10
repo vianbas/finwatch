@@ -57,6 +57,12 @@ var (
 	validLevels = map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
 )
 
+// publishedExampleJWTSigningSecret is the JWT_SIGNING_SECRET value published
+// in .env.example and used as the docker-compose.yml default. It is safe for
+// local development only: anyone who has read the repository can forge an
+// admin token with it, so Validate rejects it outside development.
+const publishedExampleJWTSigningSecret = "dev_only_example_secret_change_me_32+chars"
+
 // Load reads configuration using the provided getenv function (typically
 // os.Getenv) and validates it. Passing getenv explicitly keeps Load pure and
 // testable without mutating process environment.
@@ -124,6 +130,9 @@ func (c Config) Validate() error {
 	}
 	if len(c.JWTSigningSecret) < 32 {
 		return fmt.Errorf("config: JWT_SIGNING_SECRET must be at least 32 characters")
+	}
+	if c.AppEnv != "development" && c.JWTSigningSecret == publishedExampleJWTSigningSecret {
+		return fmt.Errorf("config: JWT_SIGNING_SECRET must not be the published example value outside development")
 	}
 	for name, d := range map[string]time.Duration{
 		"HTTP_READ_HEADER_TIMEOUT": c.ReadHeaderTimeout,
