@@ -93,6 +93,52 @@ func TestVerify_MissingExpiration(t *testing.T) {
 	}
 }
 
+func TestVerify_RejectsHS512Signature(t *testing.T) {
+	verifier := NewVerifier([]byte(testSecret))
+
+	claims := tokenClaims{
+		Email: "operator@example.com",
+		Role:  string(RoleOperator),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "user-1",
+			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(15 * time.Minute)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	signed, err := token.SignedString([]byte(testSecret))
+	if err != nil {
+		t.Fatalf("SignedString: %v", err)
+	}
+
+	if _, err := verifier.Verify(signed); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("got %v, want ErrInvalidToken", err)
+	}
+}
+
+func TestVerify_RejectsAlgNone(t *testing.T) {
+	verifier := NewVerifier([]byte(testSecret))
+
+	claims := tokenClaims{
+		Email: "operator@example.com",
+		Role:  string(RoleAdmin),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "user-1",
+			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(15 * time.Minute)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodNone, claims)
+	signed, err := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	if err != nil {
+		t.Fatalf("SignedString: %v", err)
+	}
+
+	if _, err := verifier.Verify(signed); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("got %v, want ErrInvalidToken", err)
+	}
+}
+
 func TestVerify_MissingIssuedAt(t *testing.T) {
 	verifier := NewVerifier([]byte(testSecret))
 

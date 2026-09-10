@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/vianbas/finwatch/apps/api/internal/auth"
 )
 
@@ -119,6 +121,50 @@ func TestRequireAuth_ValidToken(t *testing.T) {
 	}
 	if got := rec.Header().Get("X-Role"); got != "operator" {
 		t.Errorf("X-Role = %q, want operator", got)
+	}
+}
+
+// rawClaims mirrors the on-the-wire shape of auth's unexported tokenClaims,
+// letting this external test package build a validly-signed token carrying
+// an arbitrary role string that Role's constants do not cover.
+type rawClaims struct {
+	Email string `json:"email"`
+	Role  string `json:"role"`
+	jwt.RegisteredClaims
+}
+
+func issueTokenWithRawRole(t *testing.T, role string) string {
+	t.Helper()
+	now := time.Now().UTC()
+	claims := rawClaims{
+		Email: "operator@example.com",
+		Role:  role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "user-1",
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString([]byte(mwTestSecret))
+	if err != nil {
+		t.Fatalf("SignedString: %v", err)
+	}
+	return signed
+}
+
+func TestRequireRole_UnknownRoleDenied(t *testing.T) {
+	verifier := auth.NewVerifier([]byte(mwTestSecret))
+	handler := auth.RequireAuth(verifier)(auth.RequireRole(auth.RoleAdmin)(okHandler()))
+	token := issueTokenWithRawRole(t, "supervisor")
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin-only", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
 	}
 }
 
