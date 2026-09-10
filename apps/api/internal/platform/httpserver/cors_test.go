@@ -68,8 +68,21 @@ func TestCORS_PreflightFromDisallowedOrigin(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
-		t.Errorf("Access-Control-Allow-Origin = %q, want unset for disallowed origin", got)
+	h := rec.Header()
+	for _, name := range []string{"Access-Control-Allow-Origin", "Access-Control-Allow-Methods", "Access-Control-Allow-Headers", "Access-Control-Max-Age"} {
+		if got := h.Get(name); got != "" {
+			t.Errorf("%s = %q, want unset for disallowed origin", name, got)
+		}
+	}
+	varyValues := h.Values("Vary")
+	found := false
+	for _, v := range varyValues {
+		if v == "Origin" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Vary = %v, want it to contain Origin even for a disallowed origin", varyValues)
 	}
 	if !nextCalled {
 		t.Error("next handler was not called, want request to pass through untouched")

@@ -92,12 +92,14 @@ func (s *statusRecorder) WriteHeader(code int) {
 // requests carrying an Authorization header without the browser blocking
 // them.
 //
-// Requests with no Origin header, or an Origin not on the allow-list, pass
-// through untouched: no CORS headers are added. A preflight request (method
-// OPTIONS with an Access-Control-Request-Method header) from an allowed
-// origin is answered directly with 204 and is never forwarded to next. Any
-// other request from an allowed origin is annotated with
-// Access-Control-Allow-Origin and Vary: Origin before being forwarded.
+// Requests with no Origin header pass through with no CORS headers added at
+// all. A request that does carry an Origin header always gets Vary: Origin,
+// even when that origin is not on the allow-list, so that shared caches never
+// reuse a response computed for one origin when serving another. A preflight
+// request (method OPTIONS with an Access-Control-Request-Method header) from
+// an allowed origin is answered directly with 204 and is never forwarded to
+// next. Any other request from an allowed origin is additionally annotated
+// with Access-Control-Allow-Origin before being forwarded.
 //
 // Access-Control-Allow-Credentials is never set: tokens travel in the
 // Authorization header, not cookies.
@@ -110,7 +112,12 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			if origin == "" || !allowed[origin] {
+			if origin == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			w.Header().Add("Vary", "Origin")
+			if !allowed[origin] {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -121,13 +128,11 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 				h.Set("Access-Control-Allow-Methods", "GET, POST")
 				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 				h.Set("Access-Control-Max-Age", "600")
-				h.Add("Vary", "Origin")
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
 
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Add("Vary", "Origin")
 			next.ServeHTTP(w, r)
 		})
 	}
