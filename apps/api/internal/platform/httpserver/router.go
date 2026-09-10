@@ -16,11 +16,25 @@ type RouteRegistrar interface {
 	RegisterRoutes(r chi.Router)
 }
 
+// RegistrarFunc adapts a plain function to RouteRegistrar, the same pattern
+// as http.HandlerFunc.
+type RegistrarFunc func(r chi.Router)
+
+// RegisterRoutes implements RouteRegistrar.
+func (f RegistrarFunc) RegisterRoutes(r chi.Router) { f(r) }
+
 // RouterDeps are the dependencies required to build the HTTP router.
 type RouterDeps struct {
-	Logger  *slog.Logger
-	Health  *HealthHandler
+	Logger *slog.Logger
+	Health *HealthHandler
+	// PublicModules mount routes that do not require authentication (e.g. login).
+	PublicModules []RouteRegistrar
+	// Modules mount routes that require a valid bearer token when RequireAuth
+	// is set.
 	Modules []RouteRegistrar
+	// RequireAuth, if non-nil, wraps Modules' routes. It is a plain middleware
+	// function so this package has no dependency on the auth feature package.
+	RequireAuth func(http.Handler) http.Handler
 }
 
 // NewRouter builds the application's HTTP handler with the standard middleware
@@ -37,12 +51,24 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/health/live", deps.Health.Live)
 	r.Get("/health/ready", deps.Health.Ready)
 
-	// Feature modules mount their own routes.
-	for _, m := range deps.Modules {
+	// Public feature routes (e.g. login) mount without auth middleware.
+	for _, m := range deps.PublicModules {
 		if m != nil {
 			m.RegisterRoutes(r)
 		}
 	}
+
+	// Protected feature routes run behind RequireAuth when configured.
+	r.Group(func(pr chi.Router) {
+		if deps.RequireAuth != nil {
+			pr.Use(deps.RequireAuth)
+		}
+		for _, m := range deps.Modules {
+			if m != nil {
+				m.RegisterRoutes(pr)
+			}
+		}
+	})
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		web.WriteError(w, http.StatusNotFound, "NOT_FOUND", "resource not found")
