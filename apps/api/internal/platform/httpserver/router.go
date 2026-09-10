@@ -35,6 +35,10 @@ type RouterDeps struct {
 	// RequireAuth, if non-nil, wraps Modules' routes. It is a plain middleware
 	// function so this package has no dependency on the auth feature package.
 	RequireAuth func(http.Handler) http.Handler
+	// CORSAllowedOrigins is the exact-match allow-list for cross-origin
+	// browser requests (e.g. the web app's origin). When empty or nil, the
+	// CORS middleware is not applied.
+	CORSAllowedOrigins []string
 }
 
 // NewRouter builds the application's HTTP handler with the standard middleware
@@ -46,6 +50,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Use(RequestID)
 	r.Use(Recoverer(deps.Logger))
 	r.Use(AccessLog(deps.Logger))
+	if len(deps.CORSAllowedOrigins) > 0 {
+		r.Use(CORS(deps.CORSAllowedOrigins))
+	}
 
 	// Operational endpoints. These are intentionally unauthenticated.
 	r.Get("/health/live", deps.Health.Live)

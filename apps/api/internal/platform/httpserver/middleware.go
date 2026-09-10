@@ -85,6 +85,54 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
+// CORS returns a middleware that answers cross-origin requests from an
+// explicit allow-list of origins, using exact string comparison (no
+// wildcards, no suffix matching). It exists to let the web app (served from a
+// different origin than the API) complete a JSON POST /login and send
+// requests carrying an Authorization header without the browser blocking
+// them.
+//
+// Requests with no Origin header, or an Origin not on the allow-list, pass
+// through untouched: no CORS headers are added. A preflight request (method
+// OPTIONS with an Access-Control-Request-Method header) from an allowed
+// origin is answered directly with 204 and is never forwarded to next. Any
+// other request from an allowed origin is annotated with
+// Access-Control-Allow-Origin and Vary: Origin before being forwarded.
+//
+// Access-Control-Allow-Credentials is never set: tokens travel in the
+// Authorization header, not cookies.
+func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
+	allowed := make(map[string]bool, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		allowed[o] = true
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			if origin == "" || !allowed[origin] {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+				h := w.Header()
+				h.Set("Access-Control-Allow-Origin", origin)
+				h.Set("Access-Control-Allow-Methods", "GET, POST")
+				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				h.Set("Access-Control-Max-Age", "600")
+				h.Add("Vary", "Origin")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Add("Vary", "Origin")
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // AccessLog emits one structured JSON line per request with method, path,
 // status and latency. It is the only request-scoped logging in the skeleton.
 func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
