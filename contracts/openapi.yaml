@@ -82,6 +82,7 @@ paths:
       tags: [auth]
       operationId: login
       summary: Authenticate with email and password
+      description: Verifies email and password and, on success, returns a short-lived HS256 access token.
       security: []
       requestBody:
         required: true
@@ -121,6 +122,7 @@ paths:
       tags: [auth]
       operationId: getCurrentUser
       summary: Get the authenticated user
+      description: Returns the identity and role encoded in the caller's bearer token.
       responses:
         "200":
           description: The authenticated user.
@@ -470,6 +472,11 @@ components:
               message: resource not found
     Unauthorized:
       description: Missing, malformed, or expired bearer token.
+      headers:
+        WWW-Authenticate:
+          description: Bearer
+          schema:
+            type: string
       content:
         application/json:
           schema:
