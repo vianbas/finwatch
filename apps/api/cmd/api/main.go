@@ -152,18 +152,27 @@ func runSeedUsers() error {
 	}
 	defer pool.Close()
 
+	// Fallback literals below are example development credentials only (also
+	// published in .env.example / docker-compose.yml); demoPassword refuses
+	// to use them outside development.
 	demoUsers := []struct {
 		email    string
-		password string
+		envKey   string
+		fallback string
 		role     auth.Role
 	}{
-		{email: "operator@example.com", password: demoPassword("DEMO_OPERATOR_PASSWORD", "operator_dev_password"), role: auth.RoleOperator},
-		{email: "admin@example.com", password: demoPassword("DEMO_ADMIN_PASSWORD", "admin_dev_password"), role: auth.RoleAdmin},
+		{email: "operator@example.com", envKey: "DEMO_OPERATOR_PASSWORD", fallback: "operator_dev_password", role: auth.RoleOperator},
+		{email: "admin@example.com", envKey: "DEMO_ADMIN_PASSWORD", fallback: "admin_dev_password", role: auth.RoleAdmin},
 	}
 
 	repo := authstore.New(pool)
 	for _, u := range demoUsers {
-		hash, err := auth.HashPassword(u.password)
+		password, err := demoPassword(os.Getenv, cfg.AppEnv, u.envKey, u.fallback)
+		if err != nil {
+			logger.Error("failed to resolve demo password", slog.String("email", u.email), slog.String("error", err.Error()))
+			return err
+		}
+		hash, err := auth.HashPassword(password)
 		if err != nil {
 			logger.Error("failed to hash demo password", slog.String("error", err.Error()))
 			return err
@@ -178,11 +187,20 @@ func runSeedUsers() error {
 	return nil
 }
 
-func demoPassword(envKey, fallback string) string {
-	if v := os.Getenv(envKey); v != "" {
-		return v
+// demoPassword resolves a demo account's password: the value of the env var
+// named by key if set; otherwise the fallback, but only when appEnv is
+// "development". Outside development a missing override is a fatal
+// misconfiguration rather than a silent fallback to a password published in
+// .env.example / docker-compose.yml — the error names the missing variable,
+// never a password.
+func demoPassword(getenv func(string) string, appEnv, key, fallback string) (string, error) {
+	if v := getenv(key); v != "" {
+		return v, nil
 	}
-	return fallback
+	if appEnv == "development" {
+		return fallback, nil
+	}
+	return "", fmt.Errorf("%s is required outside development", key)
 }
 
 // healthcheck performs a localhost liveness request against the configured port.
