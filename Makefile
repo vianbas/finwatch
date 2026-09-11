@@ -68,5 +68,5 @@ sqlc: ## Regenerate type-safe DB code from SQL (requires sqlc on PATH)
 sqlc-check: ## Verify generated DB code matches SQL sources (requires sqlc on PATH)
 	cd $(API_DIR) && sqlc diff
 
-seed: ## Ingest N synthetic transactions (make seed N=100); needs DATABASE_URL
+seed: ## Ingest N synthetic transactions (make seed N=100); needs DATABASE_URL, JWT_SIGNING_SECRET
 	cd $(API_DIR) && go run ./cmd/api seed -n $(N)

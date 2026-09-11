@@ -39,6 +39,11 @@ type Config struct {
 
 	// CORSAllowedOrigins is the list of browser origins permitted to call the API.
 	CORSAllowedOrigins []string
+
+	// JWTSigningSecret is the HS256 key used to sign and verify access tokens.
+	JWTSigningSecret string
+	// JWTAccessTokenTTL bounds how long an issued access token remains valid.
+	JWTAccessTokenTTL time.Duration
 }
 
 // Addr returns the host:port the HTTP server should bind to.
@@ -51,6 +56,12 @@ var (
 	validEnvs   = map[string]bool{"development": true, "staging": true, "production": true}
 	validLevels = map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
 )
+
+// publishedExampleJWTSigningSecret is the JWT_SIGNING_SECRET value published
+// in .env.example and used as the docker-compose.yml default. It is safe for
+// local development only: anyone who has read the repository can forge an
+// admin token with it, so Validate rejects it outside development.
+const publishedExampleJWTSigningSecret = "dev_only_example_secret_change_me_32+chars"
 
 // Load reads configuration using the provided getenv function (typically
 // os.Getenv) and validates it. Passing getenv explicitly keeps Load pure and
@@ -86,6 +97,11 @@ func Load(getenv func(string) string) (*Config, error) {
 
 	cfg.CORSAllowedOrigins = splitAndTrim(firstNonEmpty(getenv("CORS_ALLOWED_ORIGINS"), "http://localhost:5173"))
 
+	cfg.JWTSigningSecret = getenv("JWT_SIGNING_SECRET")
+	if cfg.JWTAccessTokenTTL, err = durationEnv(getenv, "JWT_ACCESS_TOKEN_TTL", 15*time.Minute); err != nil {
+		return nil, err
+	}
+
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -112,12 +128,19 @@ func (c Config) Validate() error {
 	if !strings.HasPrefix(c.DatabaseURL, "postgres://") && !strings.HasPrefix(c.DatabaseURL, "postgresql://") {
 		return fmt.Errorf("config: DATABASE_URL must be a postgres:// or postgresql:// connection string")
 	}
+	if len(c.JWTSigningSecret) < 32 {
+		return fmt.Errorf("config: JWT_SIGNING_SECRET must be at least 32 characters")
+	}
+	if c.AppEnv != "development" && c.JWTSigningSecret == publishedExampleJWTSigningSecret {
+		return fmt.Errorf("config: JWT_SIGNING_SECRET must not be the published example value outside development")
+	}
 	for name, d := range map[string]time.Duration{
 		"HTTP_READ_HEADER_TIMEOUT": c.ReadHeaderTimeout,
 		"HTTP_READ_TIMEOUT":        c.ReadTimeout,
 		"HTTP_WRITE_TIMEOUT":       c.WriteTimeout,
 		"HTTP_IDLE_TIMEOUT":        c.IdleTimeout,
 		"HTTP_SHUTDOWN_TIMEOUT":    c.ShutdownTimeout,
+		"JWT_ACCESS_TOKEN_TTL":     c.JWTAccessTokenTTL,
 	} {
 		if d <= 0 {
 			return fmt.Errorf("config: %s must be a positive duration", name)

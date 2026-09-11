@@ -21,9 +21,14 @@ servers:
   - url: http://localhost:8080
     description: Local development
 
+security:
+  - bearerAuth: []
+
 tags:
   - name: health
     description: Operational liveness and readiness probes.
+  - name: auth
+    description: Login and the current authenticated user.
   - name: transactions
     description: Synthetic transaction records.
   - name: alerts
@@ -35,6 +40,7 @@ paths:
       tags: [health]
       operationId: getLiveness
       summary: Liveness probe
+      security: []
       description: Returns 200 while the process is running. No dependencies are checked.
       responses:
         "200":
@@ -50,6 +56,7 @@ paths:
       tags: [health]
       operationId: getReadiness
       summary: Readiness probe
+      security: []
       description: Returns 200 only when all downstream dependencies are reachable.
       responses:
         "200":
@@ -70,6 +77,61 @@ paths:
                 error:
                   code: NOT_READY
                   message: database unreachable
+  /login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Authenticate with email and password
+      description: Verifies email and password and, on success, returns a short-lived HS256 access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated; returns a short-lived access token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Missing or malformed email/password.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: INVALID_BODY
+                  message: email and password are required
+        "401":
+          description: Email or password is incorrect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: INVALID_CREDENTIALS
+                  message: email or password is incorrect
+  /me:
+    get:
+      tags: [auth]
+      operationId: getCurrentUser
+      summary: Get the authenticated user
+      description: Returns the identity and role encoded in the caller's bearer token.
+      responses:
+        "200":
+          description: The authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /transactions:
     get:
       tags: [transactions]
@@ -111,6 +173,8 @@ paths:
                 error:
                   code: INVALID_QUERY
                   message: limit must be between 1 and 200
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /alerts:
     get:
       tags: [alerts]
@@ -154,6 +218,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /alerts/{id}:
     get:
       tags: [alerts]
@@ -174,6 +240,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /alerts/{id}/acknowledge:
     post:
       tags: [alerts]
@@ -205,6 +273,8 @@ paths:
                 error:
                   code: INVALID_TRANSITION
                   message: alert is not in a state that allows this transition
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /alerts/{id}/resolve:
     post:
       tags: [alerts]
@@ -232,8 +302,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived (15 minute) HS256 access token returned by POST /login.
   schemas:
     LivenessStatus:
       type: object
@@ -340,6 +418,38 @@ components:
             message:
               type: string
               description: Human-readable description; safe to display.
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    User:
+      type: object
+      required: [id, email, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [operator, admin]
+    LoginResponse:
+      type: object
+      required: [accessToken, user]
+      properties:
+        accessToken:
+          type: string
+          description: Short-lived (15 minute) HS256 JWT access token.
+        user:
+          $ref: "#/components/schemas/User"
   parameters:
     AlertId:
       name: id
@@ -360,3 +470,28 @@ components:
             error:
               code: NOT_FOUND
               message: resource not found
+    Unauthorized:
+      description: Missing, malformed, or expired bearer token.
+      headers:
+        WWW-Authenticate:
+          description: Bearer
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: missing bearer token
+    Forbidden:
+      description: The authenticated user's role does not permit this action.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: FORBIDDEN
+              message: insufficient role

@@ -61,4 +61,4 @@ command (`make dev`) brings the stack up.
 | Logging        | Structured JSON via `log/slog`.                                 |
 | Money          | Integer minor units (`BIGINT` / `int64`).                       |
 | Time           | UTC internally; RFC 3339 at API/event boundaries.               |
-| Auth (future)  | Short-lived JWT access tokens + RBAC.                            |
+| Auth           | Short-lived HS256 JWT access tokens; two roles (operator, admin); role-scoped route enforcement (`RequireRole`) not yet mounted. |

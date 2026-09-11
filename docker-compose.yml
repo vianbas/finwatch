@@ -35,6 +35,10 @@ services:
       HTTP_PORT: "8080"
       DATABASE_URL: postgres://${POSTGRES_USER:-finwatch}:${POSTGRES_PASSWORD:-finwatch_dev_password}@db:5432/${POSTGRES_DB:-finwatch}?sslmode=disable
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8081,http://localhost:5173}
+      JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET:-dev_only_example_secret_change_me_32+chars}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-15m}
+      DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:-operator_dev_password}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-admin_dev_password}
     ports:
       - "8080:8080"
     depends_on:
