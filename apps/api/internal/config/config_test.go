@@ -12,9 +12,10 @@ func envFunc(m map[string]string) func(string) string {
 
 func validEnv() map[string]string {
 	return map[string]string{
-		"APP_ENV":      "development",
-		"LOG_LEVEL":    "info",
-		"DATABASE_URL": "postgres://user:pass@localhost:5432/finwatch?sslmode=disable",
+		"APP_ENV":            "development",
+		"LOG_LEVEL":          "info",
+		"DATABASE_URL":       "postgres://user:pass@localhost:5432/finwatch?sslmode=disable",
+		"JWT_SIGNING_SECRET": "test-signing-secret-must-be-at-least-32-bytes",
 	}
 }
 
@@ -57,6 +58,26 @@ func TestLoad_OverridesParsed(t *testing.T) {
 	}
 }
 
+func TestLoad_JWTDefaultsAndOverrides(t *testing.T) {
+	cfg, err := Load(envFunc(validEnv()))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.JWTAccessTokenTTL != 15*time.Minute {
+		t.Errorf("JWTAccessTokenTTL = %v, want 15m", cfg.JWTAccessTokenTTL)
+	}
+
+	env := validEnv()
+	env["JWT_ACCESS_TOKEN_TTL"] = "5m"
+	cfg, err = Load(envFunc(env))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.JWTAccessTokenTTL != 5*time.Minute {
+		t.Errorf("JWTAccessTokenTTL = %v, want 5m", cfg.JWTAccessTokenTTL)
+	}
+}
+
 func TestLoad_ValidationErrors(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -70,6 +91,18 @@ func TestLoad_ValidationErrors(t *testing.T) {
 		{"non-integer port", func(m map[string]string) { m["HTTP_PORT"] = "abc" }},
 		{"non-duration timeout", func(m map[string]string) { m["HTTP_READ_TIMEOUT"] = "soon" }},
 		{"zero timeout", func(m map[string]string) { m["HTTP_IDLE_TIMEOUT"] = "0s" }},
+		{"missing jwt signing secret", func(m map[string]string) { delete(m, "JWT_SIGNING_SECRET") }},
+		{"short jwt signing secret", func(m map[string]string) { m["JWT_SIGNING_SECRET"] = "too-short" }},
+		{"non-duration jwt ttl", func(m map[string]string) { m["JWT_ACCESS_TOKEN_TTL"] = "soon" }},
+		{"zero jwt ttl", func(m map[string]string) { m["JWT_ACCESS_TOKEN_TTL"] = "0s" }},
+		{"published example secret in staging", func(m map[string]string) {
+			m["APP_ENV"] = "staging"
+			m["JWT_SIGNING_SECRET"] = "dev_only_example_secret_change_me_32+chars"
+		}},
+		{"published example secret in production", func(m map[string]string) {
+			m["APP_ENV"] = "production"
+			m["JWT_SIGNING_SECRET"] = "dev_only_example_secret_change_me_32+chars"
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -79,5 +112,14 @@ func TestLoad_ValidationErrors(t *testing.T) {
 				t.Fatalf("expected error for %s, got nil", tt.name)
 			}
 		})
+	}
+}
+
+func TestLoad_ExampleSecretAllowedInDevelopment(t *testing.T) {
+	env := validEnv()
+	env["APP_ENV"] = "development"
+	env["JWT_SIGNING_SECRET"] = "dev_only_example_secret_change_me_32+chars"
+	if _, err := Load(envFunc(env)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -29,7 +29,9 @@
 - Bounded HTTP timeouts and graceful shutdown by default.
 - Panic recovery prevents a single request from crashing the process.
 - Structured logs must never contain secrets or raw personal/financial data.
-- Planned auth: short-lived JWT access tokens + RBAC (not in the bootstrap).
+- Auth: short-lived HS256 JWT access tokens (`JWT_SIGNING_SECRET`, at least 32
+  characters) + two roles (operator, admin); `RequireRole` exists but is not
+  yet mounted on any route.
 
 ## Reporting
 

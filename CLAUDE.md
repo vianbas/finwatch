@@ -30,8 +30,9 @@ product, and must never be represented as one.
   components. Data fetching via TanStack Query. Charts via Recharts.
 - **Real-time:** PostgreSQL transactional **outbox** + an in-process WebSocket
   hub. Do **not** add Kafka, Redis, NATS, or RabbitMQ.
-- **Auth (future):** short-lived JWT access tokens + RBAC. Not implemented in
-  the bootstrap.
+- **Auth:** short-lived (15m default) HS256 JWT access tokens via `POST
+  /login`; two roles (operator, admin). `RequireRole` exists but is not yet
+  mounted on any route.
 
 ## Contract-first
 

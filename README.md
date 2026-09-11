@@ -22,7 +22,7 @@ near-real-time monitoring and alerting platform:
 
 This repository is the **bootstrap**: structure, skeletons, contracts, docs,
 local environment, and CI. Business features (transactions, alerts, rule
-evaluation, auth, live streaming) arrive in later issues.
+evaluation, live streaming) arrive in later issues.
 
 ## Repository layout
 
@@ -49,6 +49,12 @@ Then:
 - API readiness — http://localhost:8080/health/ready
 - Transactions — http://localhost:8080/transactions (seed first: `make seed N=100`)
 - Web app — http://localhost:8081
+
+Every API route except `/health/*` and `POST /login` needs a bearer token.
+Apply migrations, then `seed-users`, then sign in at the web app as
+`operator@example.com` — see the
+[local development Authentication section](docs/operations/local-development.md#authentication-local-development)
+for the full sequence and example credentials.
 
 Stop the stack with `make stop`.
 
