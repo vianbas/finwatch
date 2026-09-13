@@ -1,10 +1,22 @@
 version: 2
+
+# Version updates run monthly, with minor and patch updates grouped into one PR
+# per ecosystem and a cooldown so fresh releases can settle first. Major updates
+# still get their own PR. Security updates are not affected by schedule,
+# grouping or cooldown: they are still opened as soon as an advisory is known.
+
 updates:
   # Go backend modules
   - package-ecosystem: gomod
     directory: /apps/api
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
@@ -16,7 +28,13 @@ updates:
   - package-ecosystem: npm
     directory: /apps/web
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
@@ -28,7 +46,13 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    # GitHub Actions does not support per-semver cooldown keys.
+    cooldown:
+      default-days: 7
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(ci)"
