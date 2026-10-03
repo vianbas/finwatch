@@ -42,11 +42,15 @@ Explicitly **no** external broker — no Kafka, Redis, NATS, or RabbitMQ.
 - At-least-once delivery means consumers must tolerate duplicates (idempotent
   rendering on the client).
 
-## Status in the bootstrap
+## Implementation
 
-Only the schema exists: migration `0001_init` creates `outbox_events` with a
-partial index on unpublished rows. The relay, hub, producers, and consumers are
-implemented in later issues.
+Migration `0001_init` creates `outbox_events` with a partial index on
+unpublished rows. The transactions and alerts stores write their events in the
+same database transaction as the state change. `internal/realtime` polls the
+outbox (publish, then mark `published_at`), fans events out through an
+in-process hub, and serves them at `/ws` per `contracts/asyncapi.yaml`.
+`LISTEN/NOTIFY` is not used; the poll interval is configurable via
+`OUTBOX_POLL_INTERVAL`.
 
 ## Alternatives considered
 

@@ -16,13 +16,13 @@ near-real-time monitoring and alerting platform:
   migrations, structured JSON logging, validated configuration, graceful shutdown.
 - **Frontend** — React + TypeScript + Vite, Tailwind + shadcn-compatible
   components, TanStack Query, Recharts.
-- **Real-time (planned)** — PostgreSQL transactional outbox + an in-process
-  WebSocket hub. No Kafka/Redis/NATS/RabbitMQ.
+- **Real-time** — PostgreSQL transactional outbox relayed to an in-process
+  WebSocket hub at `/ws`. No Kafka/Redis/NATS/RabbitMQ.
 - **Contracts** — OpenAPI for REST, AsyncAPI for events, as the source of truth.
 
 This repository is the **bootstrap**: structure, skeletons, contracts, docs,
 local environment, and CI. Business features (transactions, alerts, rule
-evaluation, live streaming) arrive in later issues.
+evaluation) arrive in later issues.
 
 ## Repository layout
 

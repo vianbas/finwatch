@@ -27,7 +27,7 @@ and contribute to.
 | **Tampering** | Malformed/oversized requests | Bounded HTTP timeouts; input validated at handlers (per-feature) | Schema validation against OpenAPI |
 | **Repudiation** | No trace of actions | Per-request IDs + structured access logs | Audit logging for state changes |
 | **Information disclosure** | Secrets/PII leakage | No secrets in repo; synthetic data only; logs exclude secrets/PII | Secret scanning, log review |
-| **Denial of service** | Slow-client / resource exhaustion | Read/write/idle timeouts; panic recovery; graceful shutdown | Rate limiting on `POST /login` (bcrypt cost makes it both a brute-force target and a CPU sink), connection caps |
+| **Denial of service** | Slow-client / resource exhaustion | Read/write/idle timeouts; panic recovery; graceful shutdown; WebSocket clients that fall behind are dropped instead of blocking fan-out, and dead peers are detected by pings and per-write timeouts | Rate limiting on `POST /login` (bcrypt cost makes it both a brute-force target and a CPU sink), connection caps |
 | **Elevation of privilege** | Acting beyond role | N/A (`RequireRole` exists but is not yet mounted on any route) | RBAC enforced server-side |
 
 ## Supply chain
@@ -46,5 +46,18 @@ and contribute to.
 
 ## Explicitly out of scope (bootstrap)
 
-RBAC route enforcement, transaction ingestion, rule evaluation, alerting,
-and live streaming — each will extend this model when implemented.
+RBAC route enforcement, transaction ingestion, rule evaluation, and
+alerting — each will extend this model when implemented.
+
+## Realtime stream (`/ws`)
+
+- **Spoofing:** browsers cannot send an `Authorization` header on a WebSocket
+  handshake, so the access token is offered as the `bearer.<token>`
+  subprotocol and verified before upgrading (401 otherwise). Unlike a query
+  parameter, it does not appear in access logs (only the path is logged).
+- **Cross-site WebSocket hijacking:** cross-origin handshakes are accepted only
+  from `CORS_ALLOWED_ORIGINS`; the token is never sent automatically by the
+  browser, so a hostile page cannot ride an operator's session.
+- **Token lifetime:** an open stream is closed (1008) when its token expires,
+  so a connection cannot outlive the credential that opened it.
+- **Planned:** per-user connection caps.
