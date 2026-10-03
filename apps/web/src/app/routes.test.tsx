@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/app/AuthContext";
 import { AppRoutes } from "@/app/routes";
 
@@ -18,6 +19,13 @@ function renderAt(path: string) {
 describe("AppRoutes", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    // The app shell opens the realtime socket once authenticated.
+    vi.stubGlobal(
+      "WebSocket",
+      class {
+        close() {}
+      },
+    );
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -59,12 +67,15 @@ describe("AppRoutes", () => {
 
     render(
       <AuthProvider>
-        <LoginThenRoutes />
+        <QueryClientProvider client={new QueryClient()}>
+          <LoginThenRoutes />
+        </QueryClientProvider>
       </AuthProvider>,
     );
     await userEvent.click(screen.getByText("do-login"));
     expect(await screen.findByRole("heading", { name: /dashboard/i })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: /primary/i })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/connecting/i);
   });
 
   it("renders a not-found page for unknown routes", () => {
