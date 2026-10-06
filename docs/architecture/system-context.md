@@ -15,7 +15,7 @@ to operators in near real time — with a contract-first, modular-monolith desig
 | Actor / system        | Role                                                                 |
 | --------------------- | -------------------------------------------------------------------- |
 | **Operator** (human)  | Views dashboards, triages alerts, manages operational workflows via the web app. |
-| **Web application**   | React SPA; calls the REST API and (later) subscribes to the WebSocket stream. |
+| **Web application**   | React SPA; calls the REST API and subscribes to the WebSocket stream. |
 | **FinWatch API**      | Go modular monolith; owns business logic, persistence, and realtime fan-out. |
 | **PostgreSQL**        | System of record and the transactional outbox for realtime events.   |
 | **Synthetic source** (future) | A generator/seed that produces synthetic transactions. No real data, ever. |
@@ -49,5 +49,5 @@ integrations. Everything runs locally via Docker Compose.
 
 ## Out of scope (this bootstrap)
 
-Transaction ingestion, rule evaluation, alerting, RBAC route enforcement, and
-live WebSocket streaming. These are tracked as follow-up issues.
+Transaction ingestion, rule evaluation, alerting, and RBAC route enforcement.
+These are tracked as follow-up issues.

@@ -36,7 +36,7 @@ internal/<module>            (future) feature modules: transactions, alerts, rul
 - Hosts the **transactional outbox** (`outbox_events`) that underpins realtime
   delivery (see ADR 0003).
 
-## Realtime path (planned)
+## Realtime path
 
 ```
 write tx + outbox row  ->  outbox relay (in-process)  ->  WebSocket hub  ->  clients
@@ -45,7 +45,24 @@ write tx + outbox row  ->  outbox relay (in-process)  ->  WebSocket hub  ->  cli
 
 No Kafka/Redis/NATS/RabbitMQ. The outbox guarantees an event is recorded
 atomically with the state change; the in-process hub fans it out to connected
-operators. Only the schema exists in the bootstrap.
+operators.
+
+- **Relay** (`internal/realtime`): polls unpublished rows oldest-first every
+  `OUTBOX_POLL_INTERVAL` (default 500ms), hands them to the hub, then stamps
+  `published_at`. Publishing before marking makes delivery at-least-once;
+  consecutive failures back off up to 30s. It assumes a single API instance.
+- **Hub**: non-blocking fan-out with a bounded per-client buffer. A client that
+  falls behind is dropped (close 1013) and refetches after reconnecting.
+- **`/ws` endpoint** (`internal/realtime/httpapi`): the access token travels as
+  the `bearer.<token>` subprotocol next to `finwatch.v1`, is verified before
+  the upgrade, and the connection closes with 1008 when the token expires.
+  Cross-origin handshakes must come from `CORS_ALLOWED_ORIGINS`.
+- **Web app**: `useRealtimeEvents` keeps one socket open while signed in,
+  de-duplicates on envelope `id`, and invalidates the `transactions` / `alerts`
+  TanStack Query keys; every (re)connect invalidates both because there is no
+  replay.
+
+The event contract is `contracts/asyncapi.yaml`.
 
 ## Local composition
 
