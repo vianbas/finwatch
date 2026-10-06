@@ -37,12 +37,18 @@ describe("AppRoutes", () => {
   });
 
   it("renders the dashboard with primary navigation once authenticated", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        accessToken: "token-123",
-        user: { id: "u1", email: "operator@example.com", role: "operator" },
-      }),
+    // /login returns a token; the dashboard's data requests get empty pages.
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation(async (input: string) => {
+      if (String(input).endsWith("/login")) {
+        return {
+          ok: true,
+          json: async () => ({
+            accessToken: "token-123",
+            user: { id: "u1", email: "operator@example.com", role: "operator" },
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ items: [], nextCursor: null }) };
     });
 
     function LoginThenRoutes() {
