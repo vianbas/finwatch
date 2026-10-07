@@ -23,12 +23,12 @@ and contribute to.
 
 | Threat | Example | Current mitigation | Planned |
 | ------ | ------- | ------------------ | ------- |
-| **Spoofing** | Unauthenticated access to endpoints | JWT bearer-token auth on `/me`, `/transactions`, `/alerts*`; `/login` and `/health/*` stay public | RBAC enforcement (`RequireRole`) mounted on routes |
+| **Spoofing** | Unauthenticated access to endpoints | JWT bearer-token auth on `/me`, `/transactions`, `/alerts*`, `/rules*`; `/login` and `/health/*` stay public | — |
 | **Tampering** | Malformed/oversized requests | Bounded HTTP timeouts; input validated at handlers (per-feature) | Schema validation against OpenAPI |
-| **Repudiation** | No trace of actions | Per-request IDs + structured access logs | Audit logging for state changes |
+| **Repudiation** | No trace of actions | Per-request IDs + structured access logs; rule changes log `rule_id`, `enabled` and the acting `user_id` | Persistent audit log for state changes |
 | **Information disclosure** | Secrets/PII leakage | No secrets in repo; synthetic data only; logs exclude secrets/PII | Secret scanning, log review |
 | **Denial of service** | Slow-client / resource exhaustion | Read/write/idle timeouts; panic recovery; graceful shutdown | Rate limiting on `POST /login` (bcrypt cost makes it both a brute-force target and a CPU sink), connection caps |
-| **Elevation of privilege** | Acting beyond role | N/A (`RequireRole` exists but is not yet mounted on any route) | RBAC enforced server-side |
+| **Elevation of privilege** | Acting beyond role | Role checked server-side from the verified token: `PATCH /rules/{id}` requires `admin` (`RequireRole`), operators get 403; reads and alert workflow stay open to both roles | Role-aware UI (hide admin actions from operators) |
 
 ## Supply chain
 
@@ -46,5 +46,4 @@ and contribute to.
 
 ## Explicitly out of scope (bootstrap)
 
-RBAC route enforcement, transaction ingestion, rule evaluation, alerting,
-and live streaming — each will extend this model when implemented.
+Transaction ingestion, rule evaluation, alerting, and live streaming — each will extend this model when implemented.
