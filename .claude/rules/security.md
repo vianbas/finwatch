@@ -30,8 +30,9 @@
 - Panic recovery prevents a single request from crashing the process.
 - Structured logs must never contain secrets or raw personal/financial data.
 - Auth: short-lived HS256 JWT access tokens (`JWT_SIGNING_SECRET`, at least 32
-  characters) + two roles (operator, admin); `RequireRole` exists but is not
-  yet mounted on any route.
+  characters) + two roles (operator, admin); admin-only routes (e.g.
+  `PATCH /rules/{id}`) are enforced server-side with `auth.RequireRole`
+  next to the route they protect.
 
 ## Reporting
 

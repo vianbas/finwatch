@@ -29,7 +29,7 @@ import (
 	"github.com/vianbas/finwatch/apps/api/internal/config"
 	"github.com/vianbas/finwatch/apps/api/internal/platform/httpserver"
 	"github.com/vianbas/finwatch/apps/api/internal/platform/postgres"
-	"github.com/vianbas/finwatch/apps/api/internal/rules"
+	rulehttp "github.com/vianbas/finwatch/apps/api/internal/rules/httpapi"
 	rulestore "github.com/vianbas/finwatch/apps/api/internal/rules/store"
 	"github.com/vianbas/finwatch/apps/api/internal/transactions"
 	txhttp "github.com/vianbas/finwatch/apps/api/internal/transactions/httpapi"
@@ -73,7 +73,7 @@ func main() {
 type appServices struct {
 	transactions *transactions.Service
 	alerts       *alerts.Service
-	rules        rules.Repository
+	rules        *rulestore.Store
 }
 
 // buildServices wires the feature modules over a connection pool, registering
@@ -264,6 +264,7 @@ func run() error {
 			httpserver.RegistrarFunc(authHandler.RegisterProtectedRoutes),
 			txhttp.NewHandler(svcs.transactions, logger),
 			alerthttp.NewHandler(svcs.alerts, logger),
+			rulehttp.NewHandler(svcs.rules, logger),
 		},
 		RequireAuth:        auth.RequireAuth(verifier),
 		CORSAllowedOrigins: cfg.CORSAllowedOrigins,

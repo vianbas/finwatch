@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FinWatch API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     REST contract for FinWatch — an open-source reference implementation for
     near-real-time transaction monitoring and operational alert workflows using
@@ -33,6 +33,8 @@ tags:
     description: Synthetic transaction records.
   - name: alerts
     description: Operational alerts and their lifecycle.
+  - name: rules
+    description: Declarative monitoring rules. Changing them requires the admin role.
 
 paths:
   /health/live:
@@ -304,6 +306,63 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /rules:
+    get:
+      tags: [rules]
+      operationId: listRules
+      summary: List rules
+      description: |
+        Returns every rule, enabled or not, oldest first. Available to any
+        authenticated role. The rule set is small and is not paginated.
+      responses:
+        "200":
+          description: All rules.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /rules/{id}:
+    patch:
+      tags: [rules]
+      operationId: updateRule
+      summary: Enable or disable a rule (admin only)
+      description: |
+        Sets whether a rule takes part in evaluation. Requires the `admin`
+        role. The change applies to transactions ingested afterwards; existing
+        alerts are not affected. Idempotent.
+      parameters:
+        - $ref: "#/components/parameters/RuleId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleUpdate"
+      responses:
+        "200":
+          description: The updated rule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+        "400":
+          description: The request body is missing, malformed, or has unknown fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: INVALID_BODY
+                  message: 'body must be {"enabled": true|false}'
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
   securitySchemes:
@@ -403,6 +462,50 @@ components:
         nextCursor:
           type: [string, "null"]
           description: Opaque cursor for the next page, or null when there are no more.
+    Rule:
+      type: object
+      description: |
+        A generic, declarative rule evaluated against synthetic transactions.
+        `value` is text interpreted per field: integer minor units for
+        `amount_minor`, a literal otherwise.
+      required: [id, name, field, operator, value, severity, enabled, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        field:
+          type: string
+          enum: [amount_minor, currency, direction]
+        operator:
+          type: string
+          enum: [gte, lte, eq]
+        value:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    RuleList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Rule"
+    RuleUpdate:
+      type: object
+      additionalProperties: false
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
     Error:
       type: object
       description: Canonical error envelope returned by all error responses.
@@ -451,6 +554,14 @@ components:
         user:
           $ref: "#/components/schemas/User"
   parameters:
+    RuleId:
+      name: id
+      in: path
+      required: true
+      description: Rule identifier.
+      schema:
+        type: string
+        format: uuid
     AlertId:
       name: id
       in: path

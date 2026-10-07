@@ -35,8 +35,8 @@ func TestCORS_PreflightFromAllowedOrigin(t *testing.T) {
 	if got := h.Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
 		t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, "http://localhost:5173")
 	}
-	if got := h.Get("Access-Control-Allow-Methods"); got != "GET, POST" {
-		t.Errorf("Access-Control-Allow-Methods = %q, want %q", got, "GET, POST")
+	if got := h.Get("Access-Control-Allow-Methods"); got != "GET, POST, PATCH" {
+		t.Errorf("Access-Control-Allow-Methods = %q, want %q", got, "GET, POST, PATCH")
 	}
 	if got := h.Get("Access-Control-Allow-Headers"); got != "Authorization, Content-Type" {
 		t.Errorf("Access-Control-Allow-Headers = %q, want %q", got, "Authorization, Content-Type")
