@@ -3,6 +3,7 @@ import { AppShell } from "@/app/AppShell";
 import { ProtectedRoute } from "@/app/ProtectedRoute";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { AlertsPage } from "@/pages/AlertsPage";
+import { RulesPage } from "@/pages/RulesPage";
 import { OpsPage } from "@/pages/OpsPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -21,6 +22,7 @@ export function AppRoutes() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
+          <Route path="/rules" element={<RulesPage />} />
           <Route path="/ops" element={<OpsPage />} />
         </Route>
       </Route>
