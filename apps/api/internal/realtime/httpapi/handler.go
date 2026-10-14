@@ -40,20 +40,28 @@ type Handler struct {
 	hub            *realtime.Hub
 	verifier       TokenVerifier
 	originPatterns []string
+	limiter        *connLimiter
 	log            *slog.Logger
 }
 
 // NewHandler constructs a Handler. allowedOrigins are the browser origins
 // (e.g. http://localhost:5173) permitted to open cross-origin connections;
-// same-origin connections are always allowed.
-func NewHandler(hub *realtime.Hub, verifier TokenVerifier, allowedOrigins []string, log *slog.Logger) *Handler {
+// same-origin connections are always allowed. maxPerUser caps each user's
+// concurrent streams and must be at least 1.
+func NewHandler(hub *realtime.Hub, verifier TokenVerifier, allowedOrigins []string, maxPerUser int, log *slog.Logger) *Handler {
 	patterns := make([]string, 0, len(allowedOrigins))
 	for _, o := range allowedOrigins {
 		if u, err := url.Parse(o); err == nil && u.Host != "" {
 			patterns = append(patterns, u.Host)
 		}
 	}
-	return &Handler{hub: hub, verifier: verifier, originPatterns: patterns, log: log}
+	return &Handler{
+		hub:            hub,
+		verifier:       verifier,
+		originPatterns: patterns,
+		limiter:        newConnLimiter(maxPerUser),
+		log:            log,
+	}
 }
 
 // RegisterRoutes mounts /ws. It authenticates the handshake itself, so it must
@@ -79,6 +87,16 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 		web.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "invalid or expired token")
 		return
 	}
+
+	// Reserve the user's slot before upgrading so a rejected handshake costs
+	// no WebSocket resources. The slot is held until the stream ends, however
+	// it ends, including a failed upgrade.
+	if !h.limiter.acquire(claims.UserID) {
+		h.log.WarnContext(r.Context(), "realtime: connection limit reached", slog.String("user_id", claims.UserID))
+		web.WriteError(w, http.StatusTooManyRequests, "TOO_MANY_CONNECTIONS", "too many concurrent event streams for this user")
+		return
+	}
+	defer h.limiter.release(claims.UserID)
 
 	// The server's read/write timeouts are connection deadlines that survive
 	// the upgrade; clear them so the stream outlives them. Pings and per-write
