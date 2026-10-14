@@ -98,6 +98,26 @@ func TestLoad_OutboxPollIntervalDefaultAndOverride(t *testing.T) {
 	}
 }
 
+func TestLoad_WSMaxConnectionsPerUser(t *testing.T) {
+	cfg, err := Load(envFunc(validEnv()))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.WSMaxConnectionsPerUser != 5 {
+		t.Errorf("WSMaxConnectionsPerUser = %d, want 5", cfg.WSMaxConnectionsPerUser)
+	}
+
+	env := validEnv()
+	env["WS_MAX_CONNECTIONS_PER_USER"] = "2"
+	cfg, err = Load(envFunc(env))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.WSMaxConnectionsPerUser != 2 {
+		t.Errorf("WSMaxConnectionsPerUser = %d, want 2", cfg.WSMaxConnectionsPerUser)
+	}
+}
+
 func TestLoad_ValidationErrors(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -117,6 +137,8 @@ func TestLoad_ValidationErrors(t *testing.T) {
 		{"zero jwt ttl", func(m map[string]string) { m["JWT_ACCESS_TOKEN_TTL"] = "0s" }},
 		{"non-duration outbox poll interval", func(m map[string]string) { m["OUTBOX_POLL_INTERVAL"] = "often" }},
 		{"negative outbox poll interval", func(m map[string]string) { m["OUTBOX_POLL_INTERVAL"] = "-1s" }},
+		{"zero ws connection cap", func(m map[string]string) { m["WS_MAX_CONNECTIONS_PER_USER"] = "0" }},
+		{"non-integer ws connection cap", func(m map[string]string) { m["WS_MAX_CONNECTIONS_PER_USER"] = "many" }},
 		{"published example secret in staging", func(m map[string]string) {
 			m["APP_ENV"] = "staging"
 			m["JWT_SIGNING_SECRET"] = "dev_only_example_secret_change_me_32+chars"

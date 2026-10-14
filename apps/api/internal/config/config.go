@@ -48,6 +48,8 @@ type Config struct {
 	// OutboxPollInterval is how often the realtime relay polls for unpublished
 	// outbox events.
 	OutboxPollInterval time.Duration
+	// WSMaxConnectionsPerUser caps each user's concurrent /ws streams.
+	WSMaxConnectionsPerUser int
 }
 
 // Addr returns the host:port the HTTP server should bind to.
@@ -109,6 +111,9 @@ func Load(getenv func(string) string) (*Config, error) {
 	if cfg.OutboxPollInterval, err = durationEnv(getenv, "OUTBOX_POLL_INTERVAL", 500*time.Millisecond); err != nil {
 		return nil, err
 	}
+	if cfg.WSMaxConnectionsPerUser, err = intEnv(getenv, "WS_MAX_CONNECTIONS_PER_USER", 5); err != nil {
+		return nil, err
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -135,6 +140,9 @@ func (c Config) Validate() error {
 	}
 	if !strings.HasPrefix(c.DatabaseURL, "postgres://") && !strings.HasPrefix(c.DatabaseURL, "postgresql://") {
 		return fmt.Errorf("config: DATABASE_URL must be a postgres:// or postgresql:// connection string")
+	}
+	if c.WSMaxConnectionsPerUser < 1 {
+		return fmt.Errorf("config: WS_MAX_CONNECTIONS_PER_USER %d must be at least 1", c.WSMaxConnectionsPerUser)
 	}
 	if len(c.JWTSigningSecret) < 32 {
 		return fmt.Errorf("config: JWT_SIGNING_SECRET must be at least 32 characters")

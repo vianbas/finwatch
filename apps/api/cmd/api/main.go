@@ -268,7 +268,7 @@ func run() error {
 		PublicModules: []httpserver.RouteRegistrar{
 			httpserver.RegistrarFunc(authHandler.RegisterPublicRoutes),
 			// /ws authenticates its own handshake (token in a subprotocol).
-			realtimehttp.NewHandler(hub, verifier, cfg.CORSAllowedOrigins, logger),
+			realtimehttp.NewHandler(hub, verifier, cfg.CORSAllowedOrigins, cfg.WSMaxConnectionsPerUser, logger),
 		},
 		Modules: []httpserver.RouteRegistrar{
 			httpserver.RegistrarFunc(authHandler.RegisterProtectedRoutes),
