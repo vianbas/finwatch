@@ -1,0 +1,132 @@
+# FinWatch public demo stack (single small host).
+#
+# Runs the same images as the local stack behind Caddy, which terminates TLS
+# and serves the SPA and API from one origin:
+#
+#   https://$DEMO_DOMAIN/        -> web (React SPA)
+#   https://$DEMO_DOMAIN/api/*   -> api (prefix stripped; WebSocket at /api/ws)
+#
+# All data is synthetic. Configure via deploy/demo/demo.env (copied from
+# demo.env.example) and start with:
+#
+#   docker compose -f deploy/demo/docker-compose.yml --env-file deploy/demo/demo.env up -d --build
+#
+# See docs/operations/demo-deploy.md.
+
+name: finwatch-demo
+
+x-api-env: &api-env
+  APP_ENV: production
+  LOG_LEVEL: info
+  HTTP_HOST: 0.0.0.0
+  HTTP_PORT: "8080"
+  DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}?sslmode=disable
+  CORS_ALLOWED_ORIGINS: https://${DEMO_DOMAIN:?}
+  JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET:?}
+  JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-15m}
+  DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:?}
+  DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:?}
+
+# The api image is built once from source and shared by the api service and
+# the one-shot jobs below.
+x-api-image: &api-image
+  build:
+    context: ../../apps/api
+  image: finwatch-demo-api
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+    # No published port: only the api and one-shot jobs reach Postgres.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # One-shot: apply versioned SQL migrations, then exit.
+  migrate:
+    image: migrate/migrate:v4.18.3
+    volumes:
+      - ../../apps/api/migrations:/migrations:ro
+    command:
+      - -path=/migrations
+      - -database=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      - up
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # One-shot: create the demo operator/admin accounts (idempotent).
+  seed-users:
+    <<: *api-image
+    command: ["seed-users"]
+    environment: *api-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # One-shot: ingest an initial batch of synthetic transactions. Re-run it to
+  # simulate more traffic: `docker compose ... run --rm seed`.
+  seed:
+    <<: *api-image
+    command: ["seed", "-n", "${DEMO_SEED_COUNT:-200}"]
+    environment: *api-env
+    depends_on:
+      seed-users:
+        condition: service_completed_successfully
+
+  api:
+    <<: *api-image
+    restart: unless-stopped
+    environment: *api-env
+    depends_on:
+      seed-users:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/app/api", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  web:
+    build:
+      context: ../../apps/web
+      args:
+        VITE_API_URL: https://${DEMO_DOMAIN:?}/api
+        VITE_WS_URL: wss://${DEMO_DOMAIN:?}/api/ws
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      DEMO_DOMAIN: ${DEMO_DOMAIN:?}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
