@@ -30,7 +30,39 @@ WebSocket use the same TLS certificate.
 - A DNS name whose A/AAAA record points at the host, with ports 80 and 443
   open (Caddy needs both to obtain the certificate).
 
-## Deploy
+## Free hosting: Oracle Cloud Always Free
+
+An Always Free Ampere (arm64) VM runs the whole stack unchanged; every image
+used here is published for arm64. Free-tier terms change, so check the
+provider's current limits before you start.
+
+1. **Create the VM.** In the Oracle Cloud console, create a Compute instance
+   with an Ubuntu 22.04 or 24.04 image and the `VM.Standard.A1.Flex` shape
+   (1 OCPU / 6 GB is plenty). Add your SSH public key. If the region reports
+   no capacity, retry later or pick another availability domain.
+2. **Open ports 80 and 443 in the cloud firewall.** In the instance's VCN →
+   subnet → security list, add ingress rules for TCP 80 and TCP 443 (and UDP
+   443 for HTTP/3) from `0.0.0.0/0`. The host firewall is handled by the
+   setup script.
+3. **Pick a hostname.** No domain purchase is needed: `sslip.io` resolves a
+   hostname that embeds an IP to that IP, so a VM at `203.0.113.10` can use
+   `203-0-113-10.sslip.io`, and Caddy obtains a real certificate for it.
+4. **Run the setup script** over SSH:
+
+   ```sh
+   sudo apt-get update && sudo apt-get install -y git
+   git clone https://github.com/vianbas/finwatch.git && cd finwatch
+   sudo deploy/demo/setup-host.sh 203-0-113-10.sslip.io
+   ```
+
+   It installs Docker, opens 80/443 in the host's iptables (Oracle's Ubuntu
+   images reject them by default), writes `deploy/demo/demo.env` with fresh
+   random secrets, starts the stack, and prints the demo logins to share.
+   Re-running it keeps the existing `demo.env`.
+
+The commands under *Operating the demo* need `sudo` on this host.
+
+## Deploy on any other host
 
 ```sh
 git clone https://github.com/vianbas/finwatch.git && cd finwatch
