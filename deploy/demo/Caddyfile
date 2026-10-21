@@ -1,0 +1,22 @@
+# FinWatch public demo reverse proxy. Caddy obtains and renews the TLS
+# certificate for $DEMO_DOMAIN automatically.
+{$DEMO_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		-Server
+	}
+
+	# API and WebSocket: /api/login -> api:8080/login, /api/ws -> api:8080/ws.
+	handle_path /api/* {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		reverse_proxy web:8080
+	}
+}
