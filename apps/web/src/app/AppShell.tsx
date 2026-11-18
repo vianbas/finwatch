@@ -2,6 +2,8 @@ import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { Activity, Bell, LayoutDashboard, Menu, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ConnectionStatus } from "@/app/ConnectionStatus";
+import { useRealtimeEvents } from "@/app/useRealtimeEvents";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -16,6 +18,7 @@ const navItems = [
  */
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { status } = useRealtimeEvents();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -39,15 +42,18 @@ export function AppShell() {
             </ul>
           </nav>
 
-          <button
-            type="button"
-            className="inline-flex items-center justify-center rounded-md p-2 hover:bg-accent md:hidden"
-            aria-label="Toggle navigation menu"
-            aria-expanded={mobileOpen}
-            onClick={() => setMobileOpen((open) => !open)}
-          >
-            <Menu className="h-5 w-5" aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-3">
+            <ConnectionStatus status={status} />
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-md p-2 hover:bg-accent md:hidden"
+              aria-label="Toggle navigation menu"
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen((open) => !open)}
+            >
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         {mobileOpen && (
