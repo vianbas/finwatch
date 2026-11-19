@@ -38,6 +38,7 @@ services:
       JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET:-dev_only_example_secret_change_me_32+chars}
       JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-15m}
       OUTBOX_POLL_INTERVAL: ${OUTBOX_POLL_INTERVAL:-500ms}
+      WS_MAX_CONNECTIONS_PER_USER: ${WS_MAX_CONNECTIONS_PER_USER:-5}
       DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:-operator_dev_password}
       DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-admin_dev_password}
     ports:

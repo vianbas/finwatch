@@ -56,7 +56,8 @@ operators.
 - **`/ws` endpoint** (`internal/realtime/httpapi`): the access token travels as
   the `bearer.<token>` subprotocol next to `finwatch.v1`, is verified before
   the upgrade, and the connection closes with 1008 when the token expires.
-  Cross-origin handshakes must come from `CORS_ALLOWED_ORIGINS`.
+  Cross-origin handshakes must come from `CORS_ALLOWED_ORIGINS`, and each
+  user may hold at most `WS_MAX_CONNECTIONS_PER_USER` streams (429 beyond it).
 - **Web app**: `useRealtimeEvents` keeps one socket open while signed in,
   de-duplicates on envelope `id`, and invalidates the `transactions` / `alerts`
   TanStack Query keys; every (re)connect invalidates both because there is no

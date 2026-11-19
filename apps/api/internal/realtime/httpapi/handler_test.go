@@ -31,6 +31,8 @@ func (fakeVerifier) Verify(token string) (auth.Claims, error) {
 		return auth.Claims{UserID: "u1", Role: auth.RoleOperator, ExpiresAt: time.Now().Add(time.Hour)}, nil
 	case "short":
 		return auth.Claims{UserID: "u1", Role: auth.RoleOperator, ExpiresAt: time.Now().Add(150 * time.Millisecond)}, nil
+	case "other":
+		return auth.Claims{UserID: "u2", Role: auth.RoleOperator, ExpiresAt: time.Now().Add(time.Hour)}, nil
 	default:
 		return auth.Claims{}, errors.New("invalid token")
 	}
@@ -41,9 +43,15 @@ func (fakeVerifier) Verify(token string) (auth.Claims, error) {
 // clear for long-lived streams.
 func newServer(t *testing.T) (*httptest.Server, *realtime.Hub) {
 	t.Helper()
+	srv, hub, _ := newServerWithLimit(t, 10)
+	return srv, hub
+}
+
+func newServerWithLimit(t *testing.T, maxPerUser int) (*httptest.Server, *realtime.Hub, *Handler) {
+	t.Helper()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	hub := realtime.NewHub(log)
-	h := NewHandler(hub, fakeVerifier{}, []string{"http://allowed.example"}, log)
+	h := NewHandler(hub, fakeVerifier{}, []string{"http://allowed.example"}, maxPerUser, log)
 
 	r := chi.NewRouter()
 	r.Use(httpserver.AccessLog(log))
@@ -54,7 +62,7 @@ func newServer(t *testing.T) (*httptest.Server, *realtime.Hub) {
 	srv.Config.WriteTimeout = serverTimeout
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return srv, hub
+	return srv, hub, h
 }
 
 func wsURL(srv *httptest.Server) string {
@@ -275,5 +283,59 @@ func TestParseSubprotocols(t *testing.T) {
 	token, ok := parseSubprotocols(r)
 	if !ok || token != "a.b-c_d" {
 		t.Errorf("got (%q, %v), want (a.b-c_d, true)", token, ok)
+	}
+}
+
+func TestServe_ConnectionLimitPerUser(t *testing.T) {
+	srv, _, h := newServerWithLimit(t, 2)
+
+	first, _, err := dial(t, srv, "finwatch.v1", "bearer.valid")
+	if err != nil {
+		t.Fatalf("first dial: %v", err)
+	}
+	if _, _, err := dial(t, srv, "finwatch.v1", "bearer.valid"); err != nil {
+		t.Fatalf("second dial: %v", err)
+	}
+
+	_, resp, err := dial(t, srv, "finwatch.v1", "bearer.valid")
+	if err == nil || resp == nil || resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("third dial: err=%v resp=%v, want 429", err, resp)
+	}
+	var env struct {
+		Error struct{ Code string } `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil || env.Error.Code != "TOO_MANY_CONNECTIONS" {
+		t.Errorf("error code = %q (decode err %v), want TOO_MANY_CONNECTIONS", env.Error.Code, err)
+	}
+
+	// Another user has their own budget.
+	if _, _, err := dial(t, srv, "finwatch.v1", "bearer.other"); err != nil {
+		t.Fatalf("other user's dial: %v", err)
+	}
+
+	// Closing a stream frees its slot.
+	_ = first.Close(websocket.StatusNormalClosure, "bye")
+	waitFor(t, func() bool { return h.limiter.count("u1") == 1 })
+	if _, _, err := dial(t, srv, "finwatch.v1", "bearer.valid"); err != nil {
+		t.Fatalf("dial after a slot freed: %v", err)
+	}
+}
+
+func TestServe_FailedUpgradeReleasesSlot(t *testing.T) {
+	srv, _, h := newServerWithLimit(t, 1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, resp, err := websocket.Dial(ctx, wsURL(srv), &websocket.DialOptions{
+		Subprotocols: []string{"finwatch.v1", "bearer.valid"},
+		HTTPHeader:   http.Header{"Origin": []string{"http://evil.example"}},
+	})
+	if err == nil || resp == nil || resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("err=%v resp=%v, want 403", err, resp)
+	}
+	waitFor(t, func() bool { return h.limiter.count("u1") == 0 })
+
+	if _, _, err := dial(t, srv, "finwatch.v1", "bearer.valid"); err != nil {
+		t.Fatalf("dial after a rejected upgrade: %v", err)
 	}
 }

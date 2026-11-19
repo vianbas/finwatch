@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: FinWatch Realtime API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     WebSocket/event contract for FinWatch. Real-time delivery uses a PostgreSQL
     transactional outbox relayed to an in-process WebSocket hub (no external
@@ -20,6 +20,12 @@ info:
         server verifies the token before upgrading and selects `finwatch.v1`.
         A missing or invalid token is rejected with HTTP 401 and the canonical
         error envelope; the upgrade does not happen.
+      * Each user may hold at most `WS_MAX_CONNECTIONS_PER_USER` (default 5)
+        concurrent streams, counted by the token's subject. A handshake beyond
+        the limit is rejected before upgrading with HTTP 429 and the canonical
+        error envelope (`TOO_MANY_CONNECTIONS`). Browsers surface this only as
+        a failed connection (close 1006); retrying with backoff succeeds once
+        one of the user's other streams closes.
       * The stream is server-to-client only. A client data message closes the
         connection with 1008 (policy violation).
 
