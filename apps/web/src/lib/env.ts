@@ -7,6 +7,7 @@ export interface AppEnv {
   apiUrl: string;
   /** WebSocket URL for the realtime stream, e.g. ws://localhost:8080/ws. */
   wsUrl: string;
+  demoMode: boolean;
 }
 
 type RawEnv = Record<string, string | undefined>;
@@ -37,7 +38,7 @@ export function validateEnv(source: RawEnv): AppEnv {
     throw new Error(`Invalid frontend environment:\n- ${errors.join("\n- ")}`);
   }
 
-  return { apiUrl, wsUrl };
+  return { apiUrl, wsUrl, demoMode: source.VITE_DEMO_MODE === "true" };
 }
 
 function isUrlWithScheme(value: string, schemes: string[]): boolean {
