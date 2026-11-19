@@ -1,18 +1,40 @@
 asyncapi: 3.0.0
 info:
   title: FinWatch Realtime API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     WebSocket/event contract for FinWatch. Real-time delivery uses a PostgreSQL
     transactional outbox relayed to an in-process WebSocket hub (no external
-    brokers). This bootstrap defines only the common event envelope and
-    placeholder event types; producers and the hub are implemented in later
-    issues.
+    brokers).
 
     Conventions:
       * Every event uses the common Envelope.
       * `occurredAt` is RFC 3339 (UTC).
-      * Monetary fields in future payloads are integer minor units.
+      * Monetary fields are integer minor units.
+
+    Connecting:
+      * Browsers cannot set an Authorization header on a WebSocket handshake,
+        so the access token travels in `Sec-WebSocket-Protocol`. The client
+        offers exactly two subprotocols: `finwatch.v1` and
+        `bearer.<access token>` (the same JWT returned by `POST /login`). The
+        server verifies the token before upgrading and selects `finwatch.v1`.
+        A missing or invalid token is rejected with HTTP 401 and the canonical
+        error envelope; the upgrade does not happen.
+      * The stream is server-to-client only. A client data message closes the
+        connection with 1008 (policy violation).
+
+    Delivery semantics:
+      * At-least-once. An event can be delivered more than once (e.g. after a
+        relay retry); clients must render idempotently, de-duplicating on the
+        envelope `id`.
+      * Events are pushed only to currently connected clients; there is no
+        replay. Clients refetch REST state after (re)connecting.
+
+    Server-initiated close codes:
+      * 1001 (going away) — the server is shutting down. Reconnect.
+      * 1008 (policy violation) — the access token expired. Log in again.
+      * 1013 (try again later) — the client fell too far behind and was
+        dropped. Reconnect and refetch.
   license:
     name: Apache-2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
@@ -23,6 +45,8 @@ servers:
     pathname: /ws
     protocol: ws
     description: Local development WebSocket endpoint.
+    security:
+      - $ref: "#/components/securitySchemes/bearerSubprotocol"
 
 channels:
   events:
@@ -45,6 +69,14 @@ operations:
       - $ref: "#/channels/events/messages/alertRaised"
 
 components:
+  securitySchemes:
+    bearerSubprotocol:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        HS256 access token from `POST /login`, offered as the
+        `bearer.<access token>` WebSocket subprotocol alongside `finwatch.v1`.
   messages:
     TransactionObserved:
       name: transaction.observed
@@ -66,7 +98,9 @@ components:
       properties:
         id:
           type: string
-          description: Unique event identifier.
+          description: |
+            Unique, stable event identifier (the outbox row id as a decimal
+            string). Redelivered events carry the same id.
         type:
           type: string
           description: Event type, e.g. transaction.observed or alert.raised.
@@ -80,7 +114,7 @@ components:
           description: RFC 3339 (UTC) timestamp of when the event occurred.
         data:
           type: object
-          description: Event-type-specific payload. Defined per event in later issues.
+          description: Event-type-specific payload; see the per-event schemas.
           additionalProperties: true
     AlertRaisedEnvelope:
       description: |

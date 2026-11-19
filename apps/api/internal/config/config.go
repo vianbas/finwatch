@@ -44,6 +44,10 @@ type Config struct {
 	JWTSigningSecret string
 	// JWTAccessTokenTTL bounds how long an issued access token remains valid.
 	JWTAccessTokenTTL time.Duration
+
+	// OutboxPollInterval is how often the realtime relay polls for unpublished
+	// outbox events.
+	OutboxPollInterval time.Duration
 }
 
 // Addr returns the host:port the HTTP server should bind to.
@@ -102,6 +106,10 @@ func Load(getenv func(string) string) (*Config, error) {
 		return nil, err
 	}
 
+	if cfg.OutboxPollInterval, err = durationEnv(getenv, "OUTBOX_POLL_INTERVAL", 500*time.Millisecond); err != nil {
+		return nil, err
+	}
+
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -141,6 +149,7 @@ func (c Config) Validate() error {
 		"HTTP_IDLE_TIMEOUT":        c.IdleTimeout,
 		"HTTP_SHUTDOWN_TIMEOUT":    c.ShutdownTimeout,
 		"JWT_ACCESS_TOKEN_TTL":     c.JWTAccessTokenTTL,
+		"OUTBOX_POLL_INTERVAL":     c.OutboxPollInterval,
 	} {
 		if d <= 0 {
 			return fmt.Errorf("config: %s must be a positive duration", name)
