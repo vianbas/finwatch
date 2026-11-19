@@ -10,7 +10,7 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
   const row = payload?.[0]?.payload;
   if (!active || !row) return null;
   return (
-    <div className="rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm">
+    <div className="rounded-md border border-border bg-background px-3 py-2 text-sm shadow-xs">
       <p className="font-semibold">{row.count}</p>
       <p className="text-muted-foreground">{row.name}</p>
     </div>
