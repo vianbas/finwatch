@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Activity, Bell, LayoutDashboard, Menu, Wrench } from "lucide-react";
+import { Activity, Bell, LayoutDashboard, ListChecks, Menu, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConnectionStatus } from "@/app/ConnectionStatus";
 import { useRealtimeEvents } from "@/app/useRealtimeEvents";
@@ -8,6 +8,7 @@ import { useRealtimeEvents } from "@/app/useRealtimeEvents";
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/alerts", label: "Alerts", icon: Bell },
+  { to: "/rules", label: "Rules", icon: ListChecks },
   { to: "/ops", label: "Ops", icon: Wrench },
 ];
 

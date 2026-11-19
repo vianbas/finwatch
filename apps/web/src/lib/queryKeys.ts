@@ -4,4 +4,5 @@
 export const queryKeys = {
   transactions: ["transactions"] as const,
   alerts: ["alerts"] as const,
+  rules: ["rules"] as const,
 };

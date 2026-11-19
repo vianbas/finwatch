@@ -31,6 +31,19 @@ export interface Alert {
   updatedAt: string;
 }
 
+export interface Rule {
+  id: string;
+  name: string;
+  field: "amount_minor" | "currency" | "direction";
+  operator: "gte" | "lte" | "eq";
+  /** Text interpreted per field: integer minor units for amount_minor, a literal otherwise. */
+  value: string;
+  severity: AlertSeverity;
+  enabled: boolean;
+  /** RFC 3339 (UTC). */
+  createdAt: string;
+}
+
 /** Cursor-paginated response shared by TransactionPage and AlertPage. */
 export interface Page<T> {
   items: T[];

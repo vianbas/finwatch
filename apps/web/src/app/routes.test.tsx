@@ -82,6 +82,7 @@ describe("AppRoutes", () => {
     expect(await screen.findByRole("heading", { name: /dashboard/i })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: /primary/i })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(/connecting/i);
+    expect(screen.getByRole("link", { name: "Rules" })).toHaveAttribute("href", "/rules");
   });
 
   it("renders a not-found page for unknown routes", () => {

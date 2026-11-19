@@ -3,9 +3,10 @@ import { vi } from "vitest";
 import { render } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactElement, ReactNode } from "react";
+import { useEffect, type ReactElement, type ReactNode } from "react";
 import { AuthProvider } from "@/app/AuthContext";
-import type { Alert, Transaction } from "@/lib/apiTypes";
+import { useAuth, type AuthUser } from "@/app/AuthContext";
+import type { Alert, Rule, Transaction } from "@/lib/apiTypes";
 
 // Synthetic fixtures only.
 export function makeAlert(n: number, overrides: Partial<Alert> = {}): Alert {
@@ -18,6 +19,20 @@ export function makeAlert(n: number, overrides: Partial<Alert> = {}): Alert {
     severity: "low",
     createdAt: "2026-01-02T03:04:05Z",
     updatedAt: "2026-01-02T03:05:06Z",
+    ...overrides,
+  };
+}
+
+export function makeRule(n: number, overrides: Partial<Rule> = {}): Rule {
+  return {
+    id: `e0000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
+    name: `Example rule ${n}`,
+    field: "amount_minor",
+    operator: "gte",
+    value: "500000",
+    severity: "high",
+    enabled: true,
+    createdAt: "2026-01-02T03:04:05Z",
     ...overrides,
   };
 }
@@ -48,11 +63,21 @@ export function errorResponse(status: number, code: string, message: string): Re
 
 export type ApiHandler = (url: URL, init: RequestInit | undefined) => Response | Promise<Response>;
 
-/** stubApi replaces global fetch with a handler that receives parsed URLs. */
+/**
+ * stubApi replaces global fetch with a handler that receives parsed URLs.
+ * POST /login is answered here (the role is the email's local part, see
+ * renderPage) so tests can sign in as a given role.
+ */
 export function stubApi(handler: ApiHandler) {
-  const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
-    handler(new URL(String(input)), init),
-  );
+  const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+    if (url.pathname === "/login" && init?.method === "POST") {
+      const { email } = JSON.parse(String(init.body)) as { email: string };
+      const role = email.split("@")[0] as AuthUser["role"];
+      return jsonResponse({ accessToken: "test-token", user: { id: "u1", email, role } });
+    }
+    return handler(url, init);
+  });
   vi.stubGlobal("fetch", mock);
   return mock;
 }
@@ -82,16 +107,31 @@ function LocationProbe() {
   return <div data-testid="location">{`${pathname}${search}`}</div>;
 }
 
-/** renderPage mounts a page at a path with auth, query client, router and a location probe. */
-export function renderPage(ui: ReactElement, path = "/") {
+/** SignedInAs logs in with the stubbed /login and renders its children once signed in. */
+function SignedInAs({ role, children }: { role: AuthUser["role"]; children: ReactNode }) {
+  const { user, login } = useAuth();
+  useEffect(() => {
+    void login(`${role}@example.com`, "example-password");
+  }, [login, role]);
+  return user ? <>{children}</> : null;
+}
+
+/**
+ * renderPage mounts a page at a path with auth, query client, router and a
+ * location probe. Pass `role` to sign in first (requires stubApi to be set up).
+ */
+export function renderPage(ui: ReactElement, path = "/", options: { role?: AuthUser["role"] } = {}) {
   const client = makeQueryClient();
+  const page = (
+    <MemoryRouter initialEntries={[path]}>
+      {ui}
+      <LocationProbe />
+    </MemoryRouter>
+  );
   return render(
     <AuthProvider>
       <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={[path]}>
-          {ui}
-          <LocationProbe />
-        </MemoryRouter>
+        {options.role ? <SignedInAs role={options.role}>{page}</SignedInAs> : page}
       </QueryClientProvider>
     </AuthProvider>,
   );
