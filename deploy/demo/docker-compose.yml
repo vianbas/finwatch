@@ -106,6 +106,7 @@ services:
       args:
         VITE_API_URL: https://${DEMO_DOMAIN:?}/api
         VITE_WS_URL: wss://${DEMO_DOMAIN:?}/api/ws
+        VITE_DEMO_MODE: "true"
     restart: unless-stopped
     depends_on:
       api:
