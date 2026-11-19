@@ -34,7 +34,7 @@ export function LoginPage() {
       </div>
       <form className="space-y-4" onSubmit={handleSubmit} aria-label="Sign in">
         <div className="space-y-1">
-          <label htmlFor="email" className="text-sm font-medium">
+          <label htmlFor="email" className="block text-sm font-medium">
             Email
           </label>
           <input
@@ -49,7 +49,7 @@ export function LoginPage() {
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor="password" className="text-sm font-medium">
+          <label htmlFor="password" className="block text-sm font-medium">
             Password
           </label>
           <input
