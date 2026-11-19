@@ -85,6 +85,13 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
+// Unwrap exposes the underlying writer to http.ResponseController, so
+// handlers behind AccessLog can still hijack (WebSocket upgrades) and set
+// connection deadlines.
+func (s *statusRecorder) Unwrap() http.ResponseWriter {
+	return s.ResponseWriter
+}
+
 // CORS returns a middleware that answers cross-origin requests from an
 // explicit allow-list of origins, using exact string comparison (no
 // wildcards, no suffix matching). It exists to let the web app (served from a
@@ -125,7 +132,7 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 				h := w.Header()
 				h.Set("Access-Control-Allow-Origin", origin)
-				h.Set("Access-Control-Allow-Methods", "GET, POST")
+				h.Set("Access-Control-Allow-Methods", "GET, POST, PATCH")
 				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 				h.Set("Access-Control-Max-Age", "600")
 				w.WriteHeader(http.StatusNoContent)

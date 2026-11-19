@@ -44,6 +44,12 @@ type Config struct {
 	JWTSigningSecret string
 	// JWTAccessTokenTTL bounds how long an issued access token remains valid.
 	JWTAccessTokenTTL time.Duration
+
+	// OutboxPollInterval is how often the realtime relay polls for unpublished
+	// outbox events.
+	OutboxPollInterval time.Duration
+	// WSMaxConnectionsPerUser caps each user's concurrent /ws streams.
+	WSMaxConnectionsPerUser int
 }
 
 // Addr returns the host:port the HTTP server should bind to.
@@ -102,6 +108,13 @@ func Load(getenv func(string) string) (*Config, error) {
 		return nil, err
 	}
 
+	if cfg.OutboxPollInterval, err = durationEnv(getenv, "OUTBOX_POLL_INTERVAL", 500*time.Millisecond); err != nil {
+		return nil, err
+	}
+	if cfg.WSMaxConnectionsPerUser, err = intEnv(getenv, "WS_MAX_CONNECTIONS_PER_USER", 5); err != nil {
+		return nil, err
+	}
+
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -128,6 +141,9 @@ func (c Config) Validate() error {
 	if !strings.HasPrefix(c.DatabaseURL, "postgres://") && !strings.HasPrefix(c.DatabaseURL, "postgresql://") {
 		return fmt.Errorf("config: DATABASE_URL must be a postgres:// or postgresql:// connection string")
 	}
+	if c.WSMaxConnectionsPerUser < 1 {
+		return fmt.Errorf("config: WS_MAX_CONNECTIONS_PER_USER %d must be at least 1", c.WSMaxConnectionsPerUser)
+	}
 	if len(c.JWTSigningSecret) < 32 {
 		return fmt.Errorf("config: JWT_SIGNING_SECRET must be at least 32 characters")
 	}
@@ -141,6 +157,7 @@ func (c Config) Validate() error {
 		"HTTP_IDLE_TIMEOUT":        c.IdleTimeout,
 		"HTTP_SHUTDOWN_TIMEOUT":    c.ShutdownTimeout,
 		"JWT_ACCESS_TOKEN_TTL":     c.JWTAccessTokenTTL,
+		"OUTBOX_POLL_INTERVAL":     c.OutboxPollInterval,
 	} {
 		if d <= 0 {
 			return fmt.Errorf("config: %s must be a positive duration", name)

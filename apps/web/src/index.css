@@ -23,6 +23,13 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+
+    /* Chart tokens (validated with the dataviz palette script). */
+    --chart-bar: #2a78d6;
+    --chart-bar-hover: #5598e7;
+    --chart-grid: #e1e0d9;
+    --chart-axis: #c3c2b7;
+    --chart-text: #52514e;
   }
 
   .dark {
@@ -43,6 +50,12 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    --chart-bar: #3987e5;
+    --chart-bar-hover: #6da7ec;
+    --chart-grid: #2c2c2a;
+    --chart-axis: #383835;
+    --chart-text: #c3c2b7;
   }
 
   * {

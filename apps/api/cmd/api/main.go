@@ -29,7 +29,10 @@ import (
 	"github.com/vianbas/finwatch/apps/api/internal/config"
 	"github.com/vianbas/finwatch/apps/api/internal/platform/httpserver"
 	"github.com/vianbas/finwatch/apps/api/internal/platform/postgres"
-	"github.com/vianbas/finwatch/apps/api/internal/rules"
+	"github.com/vianbas/finwatch/apps/api/internal/realtime"
+	realtimehttp "github.com/vianbas/finwatch/apps/api/internal/realtime/httpapi"
+	realtimestore "github.com/vianbas/finwatch/apps/api/internal/realtime/store"
+	rulehttp "github.com/vianbas/finwatch/apps/api/internal/rules/httpapi"
 	rulestore "github.com/vianbas/finwatch/apps/api/internal/rules/store"
 	"github.com/vianbas/finwatch/apps/api/internal/transactions"
 	txhttp "github.com/vianbas/finwatch/apps/api/internal/transactions/httpapi"
@@ -73,7 +76,7 @@ func main() {
 type appServices struct {
 	transactions *transactions.Service
 	alerts       *alerts.Service
-	rules        rules.Repository
+	rules        *rulestore.Store
 }
 
 // buildServices wires the feature modules over a connection pool, registering
@@ -254,16 +257,24 @@ func run() error {
 	authSvc := auth.NewService(authstore.New(pool), issuer)
 	authHandler := authhttp.NewHandler(authSvc, logger)
 
+	// Realtime: the relay moves committed outbox events into the hub, which
+	// fans them out to /ws clients.
+	hub := realtime.NewHub(logger)
+	relay := realtime.NewRelay(realtimestore.New(pool), hub, cfg.OutboxPollInterval, logger)
+
 	router := httpserver.NewRouter(httpserver.RouterDeps{
 		Logger: logger,
 		Health: httpserver.NewHealthHandler(pool),
 		PublicModules: []httpserver.RouteRegistrar{
 			httpserver.RegistrarFunc(authHandler.RegisterPublicRoutes),
+			// /ws authenticates its own handshake (token in a subprotocol).
+			realtimehttp.NewHandler(hub, verifier, cfg.CORSAllowedOrigins, cfg.WSMaxConnectionsPerUser, logger),
 		},
 		Modules: []httpserver.RouteRegistrar{
 			httpserver.RegistrarFunc(authHandler.RegisterProtectedRoutes),
 			txhttp.NewHandler(svcs.transactions, logger),
 			alerthttp.NewHandler(svcs.alerts, logger),
+			rulehttp.NewHandler(svcs.rules, logger),
 		},
 		RequireAuth:        auth.RequireAuth(verifier),
 		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
@@ -281,6 +292,12 @@ func run() error {
 	// Trap termination signals to drive graceful shutdown.
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	relayDone := make(chan struct{})
+	go func() {
+		defer close(relayDone)
+		relay.Run(ctx)
+	}()
 
 	serverErr := make(chan error, 1)
 	go func() {
@@ -303,6 +320,12 @@ func run() error {
 		logger.Info("shutdown signal received, draining connections",
 			slog.Duration("timeout", cfg.ShutdownTimeout))
 	}
+
+	// Stop relaying, then tell WebSocket clients to reconnect elsewhere:
+	// Shutdown does not track upgraded (hijacked) connections.
+	stop()
+	<-relayDone
+	hub.Close()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()

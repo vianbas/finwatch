@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/app/AuthContext";
 import { AppRoutes } from "@/app/routes";
 
@@ -18,6 +19,13 @@ function renderAt(path: string) {
 describe("AppRoutes", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    // The app shell opens the realtime socket once authenticated.
+    vi.stubGlobal(
+      "WebSocket",
+      class {
+        close() {}
+      },
+    );
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -29,12 +37,18 @@ describe("AppRoutes", () => {
   });
 
   it("renders the dashboard with primary navigation once authenticated", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        accessToken: "token-123",
-        user: { id: "u1", email: "operator@example.com", role: "operator" },
-      }),
+    // /login returns a token; the dashboard's data requests get empty pages.
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation(async (input: string) => {
+      if (String(input).endsWith("/login")) {
+        return {
+          ok: true,
+          json: async () => ({
+            accessToken: "token-123",
+            user: { id: "u1", email: "operator@example.com", role: "operator" },
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ items: [], nextCursor: null }) };
     });
 
     function LoginThenRoutes() {
@@ -59,12 +73,16 @@ describe("AppRoutes", () => {
 
     render(
       <AuthProvider>
-        <LoginThenRoutes />
+        <QueryClientProvider client={new QueryClient()}>
+          <LoginThenRoutes />
+        </QueryClientProvider>
       </AuthProvider>,
     );
     await userEvent.click(screen.getByText("do-login"));
     expect(await screen.findByRole("heading", { name: /dashboard/i })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: /primary/i })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/connecting/i);
+    expect(screen.getByRole("link", { name: "Rules" })).toHaveAttribute("href", "/rules");
   });
 
   it("renders a not-found page for unknown routes", () => {
