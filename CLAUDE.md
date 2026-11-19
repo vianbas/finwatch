@@ -31,8 +31,8 @@ product, and must never be represented as one.
 - **Real-time:** PostgreSQL transactional **outbox** + an in-process WebSocket
   hub. Do **not** add Kafka, Redis, NATS, or RabbitMQ.
 - **Auth:** short-lived (15m default) HS256 JWT access tokens via `POST
-  /login`; two roles (operator, admin). `RequireRole` exists but is not yet
-  mounted on any route.
+  /login`; two roles (operator, admin). Admin-only routes (rule changes) are
+  enforced server-side with `auth.RequireRole`.
 
 ## Contract-first
 

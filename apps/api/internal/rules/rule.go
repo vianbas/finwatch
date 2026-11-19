@@ -6,7 +6,9 @@ package rules
 
 import (
 	"context"
+	"errors"
 	"strconv"
+	"time"
 
 	"github.com/vianbas/finwatch/apps/api/internal/transactions"
 )
@@ -32,14 +34,18 @@ const (
 // Rule is a single declarative rule. Value is stored as text and interpreted
 // per field (an integer for amount_minor, a literal otherwise).
 type Rule struct {
-	ID       string
-	Name     string
-	Field    Field
-	Operator Operator
-	Value    string
-	Severity string
-	Enabled  bool
+	ID        string
+	Name      string
+	Field     Field
+	Operator  Operator
+	Value     string
+	Severity  string
+	Enabled   bool
+	CreatedAt time.Time
 }
+
+// ErrNotFound is returned when a rule id does not exist.
+var ErrNotFound = errors.New("rules: rule not found")
 
 // Match is a rule that fired for a transaction.
 type Match struct {
