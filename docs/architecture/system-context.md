@@ -49,5 +49,5 @@ integrations. Everything runs locally via Docker Compose.
 
 ## Out of scope (this bootstrap)
 
-Transaction ingestion, rule evaluation, alerting, and RBAC route enforcement.
-These are tracked as follow-up issues.
+Transaction ingestion, rule evaluation, and alerting. These are tracked as
+follow-up issues.

@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const insertRuleIfAbsent = `-- name: InsertRuleIfAbsent :exec
@@ -70,4 +72,67 @@ func (q *Queries) ListEnabledRules(ctx context.Context) ([]Rule, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const listRules = `-- name: ListRules :many
+SELECT id, name, field, operator, value, severity, enabled, created_at
+FROM rules
+ORDER BY created_at, id
+`
+
+func (q *Queries) ListRules(ctx context.Context) ([]Rule, error) {
+	rows, err := q.db.Query(ctx, listRules)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Rule
+	for rows.Next() {
+		var i Rule
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Field,
+			&i.Operator,
+			&i.Value,
+			&i.Severity,
+			&i.Enabled,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setRuleEnabled = `-- name: SetRuleEnabled :one
+UPDATE rules
+SET enabled = $1
+WHERE id = $2
+RETURNING id, name, field, operator, value, severity, enabled, created_at
+`
+
+type SetRuleEnabledParams struct {
+	Enabled bool        `json:"enabled"`
+	ID      pgtype.UUID `json:"id"`
+}
+
+func (q *Queries) SetRuleEnabled(ctx context.Context, arg SetRuleEnabledParams) (Rule, error) {
+	row := q.db.QueryRow(ctx, setRuleEnabled, arg.Enabled, arg.ID)
+	var i Rule
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Field,
+		&i.Operator,
+		&i.Value,
+		&i.Severity,
+		&i.Enabled,
+		&i.CreatedAt,
+	)
+	return i, err
 }
