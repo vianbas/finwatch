@@ -57,8 +57,10 @@ provider's current limits before you start.
 
    It installs Docker, opens 80/443 in the host's iptables (Oracle's Ubuntu
    images reject them by default), writes `deploy/demo/demo.env` with fresh
-   random secrets, starts the stack, and prints the demo logins to share.
-   Re-running it keeps the existing `demo.env`.
+   random secrets, starts the stack, installs `/etc/cron.d/finwatch-demo`
+   (10 synthetic transactions every two minutes, full reset nightly at 03:00
+   UTC), and prints the demo logins to share. Re-running it keeps the
+   existing `demo.env`.
 
 The commands under *Operating the demo* need `sudo` on this host.
 
@@ -82,10 +84,12 @@ curl https://$DEMO_DOMAIN/api/health/ready   # {"status":"ready"}
 
 ## Operating the demo
 
-Simulate more traffic (ingests another batch and raises alerts):
+Simulate more traffic (ingests another batch and raises alerts). Keep live
+batches small: the WebSocket hub disconnects a client that falls behind a
+large burst, so prefer `-n 10` while visitors are connected:
 
 ```sh
-docker compose -f deploy/demo/docker-compose.yml --env-file deploy/demo/demo.env run --rm seed
+docker compose -f deploy/demo/docker-compose.yml --env-file deploy/demo/demo.env run --rm seed seed -n 10
 ```
 
 Reset to a clean, freshly seeded state (visitors can acknowledge and resolve

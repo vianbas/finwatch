@@ -23,7 +23,7 @@ env_file="$demo_dir/demo.env"
 
 echo "==> Installing Docker Engine and Compose"
 apt-get update -q
-DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker.io docker-compose-v2 openssl
+DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker.io docker-compose-v2 openssl cron
 systemctl enable --now docker
 
 # Oracle's Ubuntu images ship an iptables INPUT chain that rejects everything
@@ -55,8 +55,19 @@ DEMO_SEED_COUNT=200
 EOF
 fi
 
+compose="docker compose -f $demo_dir/docker-compose.yml --env-file $env_file"
+
 echo "==> Building and starting the demo stack"
-docker compose -f "$demo_dir/docker-compose.yml" --env-file "$env_file" up -d --build
+$compose up -d --build
+
+# Keep the demo alive: a small batch of synthetic transactions every two
+# minutes (small enough that live WebSocket clients keep up), and a nightly
+# reset to a freshly seeded state so visitors' changes do not accumulate.
+echo "==> Installing /etc/cron.d/finwatch-demo"
+cat >/etc/cron.d/finwatch-demo <<EOF
+*/2 * * * * root $compose run --rm seed seed -n 10 >/dev/null 2>&1
+0 3 * * * root $compose down -v >/dev/null 2>&1 && $compose up -d >/dev/null 2>&1
+EOF
 
 # shellcheck source=/dev/null
 source "$env_file"
