@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/AuthContext";
 import { Button } from "@/components/ui/button";
+import { env } from "@/lib/env";
 
 /** LoginPage authenticates against POST /login and stores the token in memory. */
 export function LoginPage() {
@@ -32,6 +33,11 @@ export function LoginPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
         <p className="text-sm text-muted-foreground">FinWatch operator access.</p>
       </div>
+      {env.demoMode && (
+        <p className="rounded-md border bg-muted px-3 py-2 text-center text-sm font-medium">
+          Synthetic data only
+        </p>
+      )}
       <form className="space-y-4" onSubmit={handleSubmit} aria-label="Sign in">
         <div className="space-y-1">
           <label htmlFor="email" className="text-sm font-medium">
